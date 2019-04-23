@@ -103,8 +103,7 @@ class PersonRelationship
   field :successor_id, type: BSON::ObjectId
   field :family_id, type: BSON::ObjectId
 
-	# validates_presence_of :relative_id, message: "Choose a relative"
-  validates_presence_of :predecessor_id, :successor_id, :family_id
+  validates_presence_of :relative_id, message: "Choose a relative"
   validates :kind,
             presence: true,
             allow_blank: false,

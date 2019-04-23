@@ -31,6 +31,11 @@ Then(/(.*) should see active and renewing enrollments/) do |named_person|
   person = people[named_person]
   ce = CensusEmployee.where(:first_name => /#{person[:first_name]}/i, :last_name => /#{person[:last_name]}/i).first
   effective_date = ce.employer_profile.renewing_plan_year.start_on
+
+  wait_for_condition_until(5) do
+    find_all('.hbx-enrollment-panel').count { |n| n.find_all("h3", :text => "Coverage").any? } > 1
+  end
+
   expect(page.find_all('.hbx-enrollment-panel').any?{|e|
     (e.find('.label-success').text() == 'Auto Renewing') &&
     (e.find('.enrollment-effective').text() == "Plan Start: " + effective_date.strftime('%m/%d/%Y'))
@@ -43,6 +48,19 @@ Then(/(.*) should see active and renewing enrollments/) do |named_person|
 end
 
 When(/(.*) proceed with continue on the group selection page/) do |named_person|
+  employer_profile = EmployerProfile.all.first
+  plan_year = EmployerProfile.all.first.plan_years.first.start_on.year
+  carrier_profile = EmployerProfile.all.first.plan_years.first.benefit_groups.first.reference_plan.carrier_profile
+  sic_factors = SicCodeRatingFactorSet.new(active_year: plan_year, default_factor_value: 1.0, carrier_profile: carrier_profile).tap do |factor_set|
+    factor_set.rating_factor_entries.new(factor_key: employer_profile.sic_code, factor_value: 1.0)
+  end
+  sic_factors.save!
+  group_size_factors = EmployerGroupSizeRatingFactorSet.new(active_year: plan_year, default_factor_value: 1.0, max_integer_factor_key: 5, carrier_profile: carrier_profile).tap do |factor_set|
+    [0..5].each do |size|
+      factor_set.rating_factor_entries.new(factor_key: size, factor_value: 1.0)
+    end
+  end
+  group_size_factors.save!
   sleep(1)
 
   if find_all('.interaction-click-control-continue').any?
@@ -71,8 +89,10 @@ When(/^.+ selects waiver on the plan shopping page$/) do
 end
 
 When(/^.+ submits waiver reason$/) do
-  page.find(:css, "select#waiver_reason").find(:xpath, 'option[2]').select_option
-  page.find('#waiver_reason_submit').click
+  waiver_modal = find('#waive_confirm')
+  waiver_modal.find(:xpath, "//div[contains(@class, 'selectric')][p[contains(text(), 'Please select waive reason')]]").click
+  waiver_modal.find(:xpath, "//div[contains(@class, 'selectric-scroll')]/ul/li[contains(text(), 'I have coverage through Medicaid')]").click
+  waiver_modal.find('#waiver_reason_submit').click
 end
 
 Then(/^.+ should see waiver summary page$/) do
@@ -103,3 +123,10 @@ When(/^.+ clicks continue on family members page/) do
   page.find('#dependent_buttons').find('.interaction-click-control-continue').click
 end
 
+When(/(.*) clicks continue on group selection page for dependents/) do |named_person|
+  if find_all('.interaction-click-control-continue').any?
+    find('.interaction-click-control-continue').click
+  else
+    find('.interaction-click-control-shop-for-new-plan', :wait => 10).click
+  end
+end

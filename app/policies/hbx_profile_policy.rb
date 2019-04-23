@@ -1,12 +1,14 @@
 class HbxProfilePolicy < ApplicationPolicy
 
   def view_admin_tabs?
-    return true unless role = user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.view_admin_tabs
   end
 
   def modify_admin_tabs?
-    return true unless role = user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.modify_admin_tabs
   end
 
@@ -24,23 +26,50 @@ class HbxProfilePolicy < ApplicationPolicy
   end
 
   def send_broker_agency_message?
-    return true unless role = user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.send_broker_agency_message
   end
 
   def approve_broker?
-    return true unless role = user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.approve_broker
   end
 
   def approve_ga?
-    return true unless role = user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.approve_ga
   end
 
+  def can_extend_open_enrollment?
+    role = user_hbx_staff_role
+    return false unless role
+    role.permission.can_extend_open_enrollment
+  end
+
+  def can_create_benefit_application?
+    role = user_hbx_staff_role
+    return false unless role
+    role.permission.can_create_benefit_application?
+  end
+
+  def can_change_fein?
+    role = user_hbx_staff_role
+    return false unless role
+    role.permission.can_change_fein
+  end
+
+  def can_force_publish?
+    role = user_hbx_staff_role
+    return false unless role
+    role.permission.can_force_publish
+  end
+
   def show?
-    @user.has_role?(:hbx_staff) or
-      @user.has_role?(:csr) or
+    @user.has_role?(:hbx_staff) ||
+      @user.has_role?(:csr) ||
       @user.has_role?(:assister)
   end
 
@@ -105,42 +134,16 @@ class HbxProfilePolicy < ApplicationPolicy
   end
 
   def can_add_sep?
-    return false unless role = user.person && user.person.hbx_staff_role
+    role = user_hbx_staff_role
+    return false unless role
     role.permission.can_add_sep
   end
 
-  def can_access_identity_verification_sub_tab?
-    return @user.person.hbx_staff_role.permission.can_access_identity_verification_sub_tab if (@user.person && @user.person.hbx_staff_role)
-    return false
-  end
+  private
 
-  def can_access_outstanding_verification_sub_tab?
-    return @user.person.hbx_staff_role.permission.can_access_outstanding_verification_sub_tab if (@user.person && @user.person.hbx_staff_role)
-    return false
-  end
-
-  def can_access_accept_reject_identity_documents?
-    return @user.person.hbx_staff_role.permission.can_access_accept_reject_identity_documents if (@user.person && @user.person.hbx_staff_role)
-    return false  
-  end
-
-  def can_access_accept_reject_paper_application_documents?
-    return @user.person.hbx_staff_role.permission.can_access_accept_reject_paper_application_documents if (@user.person && @user.person.hbx_staff_role)
-    return false  
-  end
-
-  def can_delete_identity_application_documents?
-    return @user.person.hbx_staff_role.permission.can_delete_identity_application_documents if (@user.person && @user.person.hbx_staff_role)
-    return false  
-  end
-
-  def can_access_user_account_tab?
-    return @user.person.hbx_staff_role.permission.can_access_user_account_tab if (@user.person && @user.person.hbx_staff_role)
-    return false
-  end
-
-  def can_add_pdc?
-    return false unless role = user.person && user.person.hbx_staff_role
-    role.permission.can_add_pdc
+  def user_hbx_staff_role
+    person = user.person
+    return nil unless person
+    person.hbx_staff_role
   end
 end

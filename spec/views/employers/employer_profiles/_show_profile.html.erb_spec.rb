@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "employers/employer_profiles/_show_profile" do
+RSpec.describe "employers/employer_profiles/_show_profile", dbclean: :after_each do
   let(:employer_profile) { FactoryGirl.create(:employer_profile) }
   let(:census_employee1) { FactoryGirl.create(:census_employee, employer_profile: employer_profile) }
   let(:census_employee2) { FactoryGirl.create(:census_employee, employer_profile: employer_profile) }
@@ -36,6 +36,8 @@ RSpec.describe "employers/employer_profiles/_show_profile" do
   end
 
   it "should display the Employees content" do
+    assign(:datatable,
+           Effective::Datatables::EmployeeDatatable.new({id: @employer_profile.id, scopes: []}))
     @tab = 'employees'
     assign(:page_alphabets, ['a', 'b', 'c'])
     render template: "employers/employer_profiles/show_profile"

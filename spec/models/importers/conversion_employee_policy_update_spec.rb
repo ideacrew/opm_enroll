@@ -29,7 +29,7 @@ describe Importers::ConversionEmployeePolicyUpdate, dbclean: :after_each do
     let(:renewal_benefit_group) { employer_profile.renewing_plan_year.benefit_groups.first }
 
     let!(:census_employee) {
-      FactoryGirl.create(:census_employee_with_active_and_renewal_assignment, employer_profile: employer_profile, benefit_group: benefit_group, renewal_benefit_group: renewal_benefit_group)
+      FactoryGirl.create(:census_employee_with_active_and_renewal_assignment, employer_profile: employer_profile, benefit_group: benefit_group, renewal_benefit_group: renewal_benefit_group, benefit_sponsors_employer_profile_id: nil)
     }
 
     let(:spouse) { FactoryGirl.create(:person, dob: TimeKeeper.date_of_record - 30.years, ssn: '555532232') }
@@ -45,8 +45,8 @@ describe Importers::ConversionEmployeePolicyUpdate, dbclean: :after_each do
       family
     }
 
-    let!(:hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: benefit_group.id, benefit_group_assignment_id: census_employee.active_benefit_group_assignment.id, effective_on: benefit_group.start_on, household: family.active_household, active_year: benefit_group.start_on.year)}
-    let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.renewal_benefit_group_assignment.id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year)}
+    let(:hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: benefit_group.id, benefit_group_assignment_id: census_employee.active_benefit_group_assignment.id, effective_on: benefit_group.start_on, household: family.active_household, active_year: benefit_group.start_on.year)}
+    let(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.benefit_group_assignments[1].id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year)}
 
     let(:record_attrs) do
       {
@@ -126,7 +126,7 @@ describe Importers::ConversionEmployeePolicyUpdate, dbclean: :after_each do
       end
 
       context 'when renewing enrollment is a passive renewal' do
-        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.renewal_benefit_group_assignment.id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
+        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.benefit_group_assignments[1].id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
 
         it 'should drop the dependent from both current and renewing enrollment' do
           expect(hbx_enrollment.hbx_enrollment_members.map(&:person)).to eq [person, spouse, child]
@@ -169,7 +169,7 @@ describe Importers::ConversionEmployeePolicyUpdate, dbclean: :after_each do
       end
 
       context 'when renewing enrollment is a passive renewal' do
-        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.renewal_benefit_group_assignment.id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
+        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.benefit_group_assignments[1].id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
 
         it 'should add dependent to both current and renewing enrollment' do
           expect(hbx_enrollment.hbx_enrollment_members.map(&:person)).to eq [person, child]
@@ -213,7 +213,7 @@ describe Importers::ConversionEmployeePolicyUpdate, dbclean: :after_each do
       end
 
       context 'when renewing enrollment is a passive renewal' do
-        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.renewal_benefit_group_assignment.id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
+        let!(:renewing_hbx_enrollment) { FactoryGirl.create(:hbx_enrollment, :with_enrollment_members, enrollment_members: family.family_members, benefit_group_id: renewal_benefit_group.id, benefit_group_assignment_id: census_employee.benefit_group_assignments[1].id, effective_on: renewal_benefit_group.start_on, household: family.active_household, active_year: renewal_benefit_group.start_on.year, aasm_state: 'auto_renewing')}
 
         it 'should add and drop children on both current and renewing enrollment' do
           expect(hbx_enrollment.hbx_enrollment_members.map(&:person)).to eq [person, spouse, child]

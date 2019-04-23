@@ -1,4 +1,5 @@
 require "rails_helper"
+if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
 require File.join(Rails.root, "app", "data_migrations", "reactivate_tax_household_with_assistance_year")
 
 describe ReactivateTaxHouseholdWithAssistanceYear, dbclean: :after_each do
@@ -82,4 +83,5 @@ describe ReactivateTaxHouseholdWithAssistanceYear, dbclean: :after_each do
       expect(person.primary_family.active_household.tax_households.pluck(:effective_ending_on).any?).to eq(true)
     end
   end
+end
 end

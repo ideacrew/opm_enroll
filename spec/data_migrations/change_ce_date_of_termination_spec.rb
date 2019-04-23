@@ -12,12 +12,12 @@ describe ChangeCeDateOfTermination do
     end
   end
 
-  describe "census employee not in terminated state" do
+  describe "census employee not in terminated state", dbclean: :after_each do
     subject { ChangeCeDateOfTermination.new("change_ce_date_of_termination", double(:current_scope => nil)) }
 
-    let(:employer_profile) { FactoryGirl.create(:employer_profile) }
+    let(:employer_profile) { census_employee.employer_profile }
     let(:employer_profile_id) { employer_profile.id }
-    let(:census_employee) { FactoryGirl.create(:census_employee, employer_profile_id: employer_profile.id, hired_on: (TimeKeeper.date_of_record - 2.years).to_s) }
+    let(:census_employee) { FactoryGirl.create(:census_employee, hired_on: (TimeKeeper.date_of_record - 2.years).to_s) }
     let(:date) { (TimeKeeper.date_of_record - 2.days).to_s }
 
     before :each do
@@ -33,13 +33,13 @@ describe ChangeCeDateOfTermination do
     end
   end
 
-  describe "census employee's in terminated state" do
+  describe "census employee's in terminated state", dbclean: :after_each do
     subject { ChangeCeDateOfTermination.new("termiante_census_employee", double(:current_scope => nil)) }
 
-    let(:employer_profile) { FactoryGirl.create(:employer_profile) }
+    let(:employer_profile) { census_employee.employer_profile }
     let(:employer_profile_id) { employer_profile.id }
     let(:date) {  (TimeKeeper::date_of_record - 1.days).to_s }
-    let(:census_employee) { FactoryGirl.create(:census_employee, employer_profile_id: employer_profile.id, hired_on: (TimeKeeper.date_of_record - 2.days)) }
+    let(:census_employee) { FactoryGirl.create(:census_employee, hired_on: (TimeKeeper.date_of_record - 2.days)) }
 
     before :each do
       allow(ENV).to receive(:[]).with('ssn').and_return census_employee.ssn

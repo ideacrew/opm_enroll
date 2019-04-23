@@ -9,15 +9,14 @@ FactoryGirl.define do
     approve_ga true
     modify_admin_tabs true
     view_admin_tabs  true
-    can_transition_family_members true
+    can_lock_unlock false
+    can_reset_password false
 
     trait :hbx_staff do
       can_complete_resident_application true
       can_add_sep true
-      can_access_new_consumer_application_sub_tab true
-      can_access_identity_verification_sub_tab true
-      can_access_outstanding_verification_sub_tab true
-      name 'hbx_staff'
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
     end
 
     trait :hbx_update_ssn do
@@ -34,8 +33,8 @@ FactoryGirl.define do
       approve_ga false
       modify_admin_tabs false
       view_admin_tabs  true
-      can_access_outstanding_verification_sub_tab true
-      name 'hbx_read_only'
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
     end
 
     trait :hbx_csr_supervisor do
@@ -48,14 +47,8 @@ FactoryGirl.define do
       approve_ga false
       modify_admin_tabs false
       view_admin_tabs  false
-      can_access_new_consumer_application_sub_tab true
-      name 'hbx_csr_supervisor'
-    end
-    
-    trait :hbx_tier3 do
-      can_view_username_and_email true
-      can_lock_unlock true
-      can_reset_password true
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
     end
 
     trait :hbx_csr_tier2 do
@@ -68,8 +61,8 @@ FactoryGirl.define do
       approve_ga false
       modify_admin_tabs false
       view_admin_tabs false
-      can_access_new_consumer_application_sub_tab true
-      name 'hbx_csr_tier2'
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
     end
 
     trait :hbx_csr_tier1 do
@@ -82,10 +75,9 @@ FactoryGirl.define do
       approve_ga false
       modify_admin_tabs false
       view_admin_tabs  false
-      can_access_new_consumer_application_sub_tab true
-      name 'hbx_csr_tier1'
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
     end
-
 
     trait :developer do
       modify_family false
@@ -98,6 +90,33 @@ FactoryGirl.define do
       modify_admin_tabs false
       view_admin_tabs  false
       name 'developer'
+    end
+
+    trait :hbx_tier3 do
+      name 'hbx_tier3'
+      modify_family true
+      modify_employer false
+      revert_application false
+      list_enrollments true
+      send_broker_agency_message false
+      approve_broker false
+      approve_ga false
+      modify_admin_tabs false
+      view_admin_tabs  true
+      can_create_benefit_application true
+      view_the_configuration_tab false 
+      can_submit_time_travel_request false
+    end
+
+    trait :super_admin do
+      name 'super_admin'
+      can_complete_resident_application true
+      can_add_sep true
+      can_extend_open_enrollment true
+      can_create_benefit_application true
+      can_force_publish true
+      view_the_configuration_tab true 
+      can_submit_time_travel_request false
     end
   end
 end

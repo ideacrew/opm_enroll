@@ -1,6 +1,22 @@
 require 'rails_helper'
+RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => :controller do
+  let(:user){ FactoryGirl.create(:user, :consumer) }
 
-RSpec.describe Insured::ConsumerRolesController, :type => :controller do
+  context "When individual market is disabled" do
+    before do
+      Settings.aca.market_kinds = %W[shop]
+      sign_in user
+      get :search
+    end
+
+    it "redirects to root" do
+      expect(response).to redirect_to(root_path)
+    end
+  end
+end
+
+if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
+RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => :controller do
   let(:user){ FactoryGirl.create(:user, :consumer) }
   let(:person){ FactoryGirl.build(:person) }
   let(:family){ double("Family") }
@@ -8,7 +24,11 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
   let(:consumer_role){ FactoryGirl.build(:consumer_role) }
   let(:bookmark_url) {'localhost:3000'}
 
-  context "GET privacy" do
+  before do
+    allow_any_instance_of(ApplicationController).to receive(:individual_market_is_enabled?).and_return(true)
+  end
+
+  context "GET privacy",dbclean: :after_each do
     before(:each) do
       sign_in user
       allow(user).to receive(:person).and_return(person)
@@ -29,7 +49,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  describe "Get search" do
+  describe "Get search",  dbclean: :after_each do
     let(:mock_employee_candidate) { instance_double("Forms::EmployeeCandidate", ssn: "333224444", dob: "08/15/1975") }
 
     before(:each) do
@@ -64,7 +84,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
 
   end
 
-  describe "POST match" do
+  describe "POST match", dbclean: :after_each do
     let(:person_parameters) { { :first_name => "SOMDFINKETHING" } }
     let(:mock_consumer_candidate) { instance_double("Forms::ConsumerCandidate", :valid? => validation_result, ssn: "333224444", dob: Date.new(1975, 8, 15), :first_name => "fname", :last_name => "lname") }
     let(:mock_employee_candidate) { instance_double("Forms::EmployeeCandidate", :valid? => validation_result, ssn: "333224444", dob: Date.new(1975, 8, 15), :first_name => "fname", :last_name => "lname", :match_census_employees => []) }
@@ -83,7 +103,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       allow(mock_resident_candidate).to receive(:valid?).and_return(false)
     end
 
-    context "given invalid parameters" do
+    context "given invalid parameters", dbclean: :after_each do
       let(:validation_result) { false }
       let(:found_person) { [] }
 
@@ -96,10 +116,10 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "given valid parameters" do
+    context "given valid parameters", dbclean: :after_each do
       let(:validation_result) { true }
 
-      context "but with no found employee" do
+      context "but with no found employee", dbclean: :after_each do
         let(:found_person) { [] }
         let(:person){ double("Person") }
         let(:person_parameters){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"000000111"}}
@@ -107,14 +127,14 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
           post :match, :person => person_parameters
         end
 
-        it "renders the 'no_match' template" do
+        it "renders the 'no_match' template", dbclean: :after_each do
           post :match, :person => person_parameters
           expect(response).to have_http_status(:success)
           expect(response).to render_template("no_match")
           expect(assigns[:consumer_candidate]).to eq mock_consumer_candidate
         end
 
-        context "that find a matching employee" do
+        context "that find a matching employee", dbclean: :after_each do
           let(:found_person) { [person] }
 
           it "renders the 'match' template" do
@@ -126,7 +146,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
         end
       end
 
-      context "when match employer" do
+      context "when match employer", dbclean: :after_each do
         before :each do
           allow(mock_consumer_candidate).to receive(:valid?).and_return(true)
           allow(mock_employee_candidate).to receive(:valid?).and_return(true)
@@ -144,7 +164,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "given user enters ssn that is already taken" do
+    context "given user enters ssn that is already taken", dbclean: :after_each do
       let(:validation_result) { true }
       before(:each) do
         allow(mock_consumer_candidate).to receive(:valid?).and_return(false)
@@ -158,7 +178,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "POST create" do
+  context "POST create", dbclean: :after_each do
     let(:person_params){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"000000111","user_id"=>"xyz"}}
     let(:person_user){ double("User") }
     before(:each) do
@@ -181,7 +201,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
   end
 
 
-  context "POST create with failed construct_employee_role" do
+  context "POST create with failed construct_employee_role", dbclean: :after_each do
     let(:person_params){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"000000111","user_id"=>"xyz"}}
     let(:person_user){ double("User") }
     before(:each) do
@@ -197,7 +217,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "GET edit" do
+  context "GET edit", dbclean: :after_each do
     before(:each) do
       allow(ConsumerRole).to receive(:find).and_return(consumer_role)
       allow(consumer_role).to receive(:person).and_return(person)
@@ -215,23 +235,11 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "GET upload_ridp_document" do
-    before(:each) do
-      allow(user).to receive(:person).and_return(person)
-      allow(person).to receive(:consumer_role?).and_return(true)
-      allow(person).to receive(:consumer_role).and_return(consumer_role)
-    end
-    it "should render new template" do
-      sign_in user
-      get :upload_ridp_document
-      expect(response).to have_http_status(:success)
-      expect(response).to render_template(:upload_ridp_document)
-    end
-  end
-
-  context "PUT update" do
-    let(:person_params){{"family"=>{"application_type"=>"Phone"}, "dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"468389102","user_id"=>"xyz", us_citizen:"true", naturalized_citizen: "true"}}
-    let(:person){ FactoryGirl.create(:person, :with_family) }
+  context "PUT update", dbclean: :after_each do
+    let(:person_params){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"468389102","user_id"=>"xyz", us_citizen:"true", naturalized_citizen: "true"}}
+    let(:person){ FactoryGirl.create(:person) }
+    let(:addresses_attributes) { {"0"=>{"kind"=>"home", "address_1"=>"address1_a", "address_2"=>"", "city"=>"city1", "state"=>"DC", "zip"=>"22211", "id"=> person.addresses[0].id.to_s},
+    "1"=>{"kind"=>"mailing", "address_1"=>"address1_b", "address_2"=>"", "city"=>"city1", "state"=>"DC", "zip"=>"22211", "id"=> person.addresses[1].id.to_s} } }
 
     before(:each) do
       allow(ConsumerRole).to receive(:find).and_return(consumer_role)
@@ -239,7 +247,29 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       allow(consumer_role).to receive(:person).and_return(person)
       allow(user).to receive(:person).and_return person
       allow(person).to receive(:consumer_role).and_return consumer_role
+      person_params[:addresses_attributes] = addresses_attributes
       sign_in user
+    end
+
+    context "to verify new addreses not created on updating the existing address" do
+      
+      before :each do
+        allow(controller).to receive(:update_vlp_documents).and_return(true)
+        put :update, person: person_params, id: "test"
+      end
+
+      it "should not empty the person's addresses on update" do
+        expect(person.addresses).not_to eq []
+      end
+
+      it "should update addresses" do
+        expect(person.addresses.first.address_1).to eq addresses_attributes["0"]["address_1"]
+        expect(person.addresses.last.address_2).to eq addresses_attributes["1"]["address_2"]
+      end
+
+      it "should have same number of addresses on update" do
+        expect(person.addresses.count).to eq 2
+      end
     end
 
     it "should update existing person" do
@@ -292,66 +322,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "PUT update as HBX Admin" do
-    let(:person_params){{"family"=>{"application_type"=>"Curam"}, "dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"468389102","user_id"=>"xyz", us_citizen:"true", naturalized_citizen: "true"}}
-    let(:person){ FactoryGirl.create(:person, :with_family, :with_hbx_staff_role) }
-
-    before(:each) do
-      allow(ConsumerRole).to receive(:find).and_return(consumer_role)
-      allow(consumer_role).to receive(:build_nested_models_for_person).and_return(true)
-      allow(consumer_role).to receive(:person).and_return(person)
-      allow(user).to receive(:person).and_return person
-      allow(person).to receive(:consumer_role).and_return consumer_role
-      sign_in user
-    end
-
-    it "should redirect to help paying for coverage path  when current user has application type as Curam" do
-      allow(consumer_role).to receive(:update_by_person).and_return(true)
-      allow(controller).to receive(:update_vlp_documents).and_return(true)
-      allow(controller).to receive(:is_new_paper_application?).and_return false
-      put :update, person: person_params, id: "test"
-      expect(response).to have_http_status(:redirect)
-      expect(response).to redirect_to help_paying_coverage_financial_assistance_applications_path
-    end
-
-    it 'should update consumer identity and application fields to valid and redirect to help paying for coverage page when current user has application type as Curam' do
-      person_params["family"]["application_type"] = "Curam"
-      allow(consumer_role).to receive(:update_by_person).and_return(true)
-      allow(controller).to receive(:update_vlp_documents).and_return(true)
-      allow(controller).to receive(:is_new_paper_application?).and_return false
-      put :update, person: person_params, id: "test"
-      expect(consumer_role.identity_validation). to eq 'valid'
-      expect(consumer_role.identity_validation). to eq 'valid'
-      expect(consumer_role.identity_update_reason). to eq 'Verified from Curam'
-      expect(response).to have_http_status(:redirect)
-      expect(response).to redirect_to help_paying_coverage_financial_assistance_applications_path
-    end
-
-    it "should redirect to help paying for coverage page when current user has application type as Mobile" do
-      person_params["family"]["application_type"] = "Mobile"
-      allow(consumer_role).to receive(:update_by_person).and_return(true)
-      allow(controller).to receive(:update_vlp_documents).and_return(true)
-      allow(controller).to receive(:is_new_paper_application?).and_return false
-      put :update, person: person_params, id: "test"
-      expect(response).to have_http_status(:redirect)
-      expect(response).to redirect_to help_paying_coverage_financial_assistance_applications_path
-    end
-
-    it 'should update consumer identity and application fields to valid and redirect to help paying for coverage page when current user has application type as Mobile' do
-      person_params["family"]["application_type"] = "Mobile"
-      allow(consumer_role).to receive(:update_by_person).and_return(true)
-      allow(controller).to receive(:update_vlp_documents).and_return(true)
-      allow(controller).to receive(:is_new_paper_application?).and_return false
-      put :update, person: person_params, id: "test"
-      expect(consumer_role.identity_validation). to eq 'valid'
-      expect(consumer_role.identity_validation). to eq 'valid'
-      expect(consumer_role.identity_update_reason). to eq 'Verified from Mobile'
-      expect(response).to have_http_status(:redirect)
-      expect(response).to redirect_to help_paying_coverage_financial_assistance_applications_path
-    end
-  end
-
-  context "GET immigration_document_options" do
+  context "GET immigration_document_options", dbclean: :after_each do
     let(:person) {FactoryGirl.create(:person, :with_consumer_role)}
     let(:params) {{target_type: 'Person', target_id: "person_id", vlp_doc_target: "vlp doc", vlp_doc_subject: "I-327 (Reentry Permit)"}}
     let(:family_member) {FactoryGirl.create(:person, :with_consumer_role)}
@@ -359,7 +330,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       sign_in user
     end
 
-    context "target type is Person" do
+    context "target type is Person", dbclean: :after_each do
       before :each do
         allow(Person).to receive(:find).and_return person
         xhr :get, 'immigration_document_options', params, format: :js
@@ -378,7 +349,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "target type is family member" do
+    context "target type is family member", dbclean: :after_each do
       xit "should get FamilyMember" do
         allow(Forms::FamilyMember).to receive(:find).and_return family_member
         xhr :get, 'immigration_document_options', {target_type: 'Forms::FamilyMember', target_id: "id", vlp_doc_target: "vlp doc", format: :js}
@@ -396,10 +367,9 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "GET ridp_agreement" do
-    let(:person100) { FactoryGirl.create(:person, :with_family, :with_consumer_role) }
+  context "GET ridp_agreement", dbclean: :after_each do
 
-    context "with a user who has already passed RIDP" do
+    context "with a user who has already passed RIDP", dbclean: :after_each do
       before :each do
         sign_in user
       end
@@ -420,7 +390,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "with a user who has not passed RIDP" do
+    context "with a user who has not passed RIDP", dbclean: :after_each do
       before :each do
         sign_in user
       end
@@ -441,28 +411,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  context "Post update application type" do
-    let(:person) { FactoryGirl.create(:person, :with_family, :with_consumer_role) }
-    let(:consumer_params) {{"family"=>{"application_type"=>"Phone"}}}
-    before :each do
-      sign_in user
-    end
-
-    before :each do
-      request.env["HTTP_REFERER"] = "http://test.com"
-      allow(user).to receive(:person).and_return(person)
-      allow(person).to receive(:consumer_role?).and_return(true)
-      allow(person).to receive(:consumer_role).and_return(consumer_role)
-    end
-
-    it "should redirect back to the same page" do
-      post :update_application_type, consumer_role_id: person.consumer_role.id, :consumer_role => consumer_params
-      expect(response).to redirect_to :back
-    end
-
-  end
-
-  describe "Post match resident role" do
+  describe "Post match resident role", dbclean: :after_each do
     let(:person_parameters) { { :first_name => "SOMDFINKETHING" } }
     let(:resident_parameters) { { :first_name => "John", :last_name => "Smith1", :dob => "4/4/1972" }}
     let(:mock_consumer_candidate) { instance_double("Forms::ConsumerCandidate", :valid? => "true", ssn: "333224444", dob: Date.new(1968, 2, 3), :first_name => "fname", :last_name => "lname") }
@@ -488,7 +437,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
 
     end
 
-    context "with pre-existing consumer_role" do
+    context "with pre-existing consumer_role", dbclean: :after_each do
       it "should not have a resident role created for it" do
         post :match, :person => resident_parameters
         expect(user.person.resident_role).to be_nil
@@ -497,7 +446,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "with pre-existing resident_role" do
+    context "with pre-existing resident_role", dbclean: :after_each do
       it "should navigate to family account page" do
         allow(person).to receive(:resident_role).and_return(resident_role)
         allow(person).to receive(:is_resident_role_active?).and_return(true)
@@ -508,7 +457,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
 
-    context "with both resident and consumer roles" do
+    context "with both resident and consumer roles", dbclean: :after_each do
       it "should navigate to family account page" do
         allow(person).to receive(:consumer_role).and_return(consumer_role)
         allow(person).to receive(:resident_role).and_return(resident_role)
@@ -523,7 +472,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
     end
   end
 
-  describe "Get edit consumer role" do
+  describe "Get edit consumer role", dbclean: :after_each do
     let(:consumer_role2){ FactoryGirl.build(:consumer_role, :bookmark_url => "http://localhost:3000/insured/consumer_role/591f44497af8800bb5000016/edit") }
     before(:each) do
       current_user = user
@@ -538,7 +487,7 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
 
     end
 
-    context "with bookmark_url pointing to another person's consumer role" do
+    context "with bookmark_url pointing to another person's consumer role", dbclean: :after_each do
 
       it "should redirect to the edit page of the consumer role of the current user" do
         sign_in user
@@ -548,4 +497,5 @@ RSpec.describe Insured::ConsumerRolesController, :type => :controller do
       end
     end
   end
+end
 end

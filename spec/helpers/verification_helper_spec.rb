@@ -1,5 +1,6 @@
 require "rails_helper"
 
+if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
 RSpec.describe VerificationHelper, :type => :helper do
   let(:person) { FactoryGirl.create(:person, :with_consumer_role) }
   let(:type) { person.consumer_role.verification_types.first }
@@ -563,4 +564,5 @@ RSpec.describe VerificationHelper, :type => :helper do
     it_behaves_like "reject reason dropdown list", "Social Security Number", "Wrong Type", "Too old"
     it_behaves_like "reject reason dropdown list", "American Indian Status", "Wrong Person", "Expired"
   end
+end
 end

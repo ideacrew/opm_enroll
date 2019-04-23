@@ -5,11 +5,11 @@ describe UploadNoticeToEmployerAccount, dbclean: :after_each do
 
   let(:given_task_name) { "upload_notice_to_employer_account" }
   subject { UploadNoticeToEmployerAccount.new(given_task_name, double(:current_scope => nil)) }
-  let!(:organization)      { FactoryGirl.create(:organization)}
+  let!(:site) { FactoryGirl.build(:benefit_sponsors_site, :with_benefit_market, :as_hbx_profile, :cca) }
+  let!(:organization) { FactoryGirl.create(:benefit_sponsors_organizations_general_organization, :with_aca_shop_cca_employer_profile, site: site) }
   let(:bucket_name) { 'notices' }
   let(:doc_id) { "urn:openhbx:terms:v1:file_storage:s3:bucket:#{bucket_name}{#sample-key" }
-  let!(:employer_profile)  { FactoryGirl.create(:employer_profile, organization: organization)}
-  let!(:plan_year)         { FactoryGirl.create(:plan_year, employer_profile: employer_profile)}
+  let(:employer_profile) { organization.employer_profile}
 
   before(:each) do
     FileUtils.mkdir "test_notices" unless File.directory?("test_notices")

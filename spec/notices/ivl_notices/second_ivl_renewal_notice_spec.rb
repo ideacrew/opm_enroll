@@ -1,6 +1,7 @@
 require 'rails_helper'
 require 'csv'
 
+if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
 RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
 
   file = "#{Rails.root}/spec/test_data/notices/second_ivl_renewal_notice_test_data.csv"
@@ -105,30 +106,5 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
     end
   end
 
-  describe "for recipient, recipient_document_store", dbclean: :after_each do
-    let!(:person100)          { FactoryGirl.create(:person, :with_consumer_role, :with_work_email) }
-    let!(:dep_family1)        { FactoryGirl.create(:family, :with_primary_family_member, person: FactoryGirl.create(:person, :with_consumer_role, :with_work_email)) }
-    let!(:dep_family_member)  { FactoryGirl.create(:family_member, family: dep_family1, person: person100) }
-    let!(:family100)          { FactoryGirl.create(:family, :with_primary_family_member, person: person100) }
-    let(:dep_fam_primary)     { dep_family1.primary_applicant.person }
-
-    before :each do
-      valid_params.merge!({:person => person100})
-      @notice = IvlNotices::SecondIvlRenewalNotice.new(person100.consumer_role, valid_params)
-    end
-
-    it "should have person100 as the recipient for the enrollment notice as this person is the primary" do
-      expect(@notice.recipient).to eq person100
-      expect(@notice.person).to eq person100
-      expect(@notice.recipient_document_store).to eq person100
-      expect(@notice.to).to eq person100.work_email_or_best
-    end
-
-    it "should not pick the dep_family1's primary person" do
-      expect(@notice.recipient).not_to eq dep_fam_primary
-      expect(@notice.person).not_to eq dep_fam_primary
-      expect(@notice.recipient_document_store).not_to eq dep_fam_primary
-      expect(@notice.to).not_to eq dep_fam_primary.work_email_or_best
-    end
-  end
+end
 end

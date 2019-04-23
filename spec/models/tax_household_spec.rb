@@ -11,8 +11,8 @@ RSpec.describe TaxHousehold, type: :model do
 # describe TaxHousehold do
 =begin
   describe "validate associations" do
-#   it { should have_and_belong_to_many  :people }
-#   it { should embed_many :special_enrollment_periods }
+#    it { should have_and_belong_to_many  :people }
+#    it { should embed_many :special_enrollment_periods }
     it { should embed_many :eligibilities }
 =end
 

@@ -1,13 +1,14 @@
 Dir.glob('db/seedfiles/translations/en/*').each do |file|
-  puts file unless Rails.env.test?
   require_relative 'translations/en/' + File.basename(file,File.extname(file))
 end
 
 puts "*"*80 unless Rails.env.test?
-puts "::: Generating English Translations :::" unless Rails.env.test?
+puts "::: Generating English Translations :::"
 
 MAIN_TRANSLATIONS = {
-  "en.shared.my_portal_links.my_insured_portal" => "My Insured Portal"
+  "en.shared.my_portal_links.my_insured_portal" => "My Insured Portal",
+  "en.shared.my_portal_links.my_broker_agency_portal" => "My Broker Agency Portal",
+  "en.shared.my_portal_links.my_employer_portal" => "My Employer Portal"
 }
 translations = [
   BOOTSTRAP_EXAMPLE_TRANSLATIONS,
@@ -20,15 +21,19 @@ translations = [
   INSURED_TRANSLATIONS,
   BROKER_AGENCIES_TRANSLATIONS,
   DEVISE_TRANSLATIONS,
-  ASSISTANCE_TRANSLATIONS
+  EMPLOYER_TRANSLATIONS,
+  PLAN_TRANSLATIONS,
+  HBX_PROFILES_TRANSLATIONS
 ].reduce({}, :merge)
 
-puts "TRANSLATIONS" unless Rails.env.test?
-p translations unless Rails.env.test?
+unless Rails.env.test?
+  puts "TRANSLATIONS"
+  p translations
+end
 
 translations.keys.each do |k|
   Translation.where(key: k).first_or_create.update_attributes!(value: "\"#{translations[k]}\"")
 end
 
-puts "::: English Translations Complete :::" unless Rails.env.test?
+puts "::: English Translations Complete :::"
 puts "*"*80 unless Rails.env.test?

@@ -1,3 +1,4 @@
+@individual_enabled
 Feature: Phone and Paper Enrollment options exist
   In order to support paper and phone enrollments
   Links are provided that will track phone and paper enrollments
@@ -11,6 +12,3 @@ Feature: Phone and Paper Enrollment options exist
   Scenario: Phone and Phone Enrollment
     Then I see the Paper link
     Then I see the Phone link
-
-  Scenario: Disabling Paper link
-    Then the Paper action should not be actionable

@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe ShopBrokerNotices::BrokerFiredNotice do
+RSpec.describe ShopBrokerNotices::BrokerFiredNotice, dbclean: :after_each do
   let(:start_on) { TimeKeeper.date_of_record.beginning_of_month + 1.month - 1.year}
   let!(:employer_profile){ create :employer_profile}
   let!(:broker_agency_profile) { create :broker_agency_profile }
@@ -29,10 +29,6 @@ RSpec.describe ShopBrokerNotices::BrokerFiredNotice do
     }}
 
   describe "New" do
-    before do
-      allow(employer_profile).to receive_message_chain("broker_agency_accounts.unscoped.last").and_return(broker_agency_account)
-      allow(employer_profile).to receive_message_chain("staff_roles.first").and_return(person)
-    end
     context "valid params" do
       it "should initialze" do
         expect{ShopBrokerNotices::BrokerFiredNotice.new(employer_profile, valid_parmas)}.not_to raise_error
@@ -52,7 +48,6 @@ RSpec.describe ShopBrokerNotices::BrokerFiredNotice do
   describe "Build" do
     before do
       allow(employer_profile).to receive_message_chain("staff_roles.first").and_return(person)
-      allow(employer_profile).to receive_message_chain("broker_agency_accounts.unscoped.last").and_return(broker_agency_account)
       @broker_notice = ShopBrokerNotices::BrokerFiredNotice.new(employer_profile, valid_parmas)
       @broker_notice.build
     end
@@ -67,7 +62,6 @@ RSpec.describe ShopBrokerNotices::BrokerFiredNotice do
   describe "Render template & Generate PDF" do
     before do
       allow(employer_profile).to receive_message_chain("staff_roles.first").and_return(person)
-      allow(employer_profile).to receive_message_chain("broker_agency_accounts.unscoped.last").and_return(broker_agency_account)
       @broker_notice = ShopBrokerNotices::BrokerFiredNotice.new(employer_profile, valid_parmas)
     end
     it "should render broker_fired_notice" do

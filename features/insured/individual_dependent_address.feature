@@ -1,3 +1,4 @@
+@individual_enabled
 Feature: Insured Plan Shopping on Individual market
 
   Scenario: New insured user purchases on individual market
@@ -42,4 +43,3 @@ Feature: Insured Plan Shopping on Individual market
     Then Individual agrees to the privacy agreeement
     When Individual clicks on Individual and Family link should be on verification page
     Then Individual should see identity verification page and clicks on submit
-

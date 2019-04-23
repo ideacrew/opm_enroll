@@ -1,10 +1,12 @@
 require "rails_helper"
+require "#{BenefitSponsors::Engine.root}/spec/shared_contexts/benefit_market.rb"
+require "#{BenefitSponsors::Engine.root}/spec/shared_contexts/benefit_application.rb"
 
 class EventsHelperSlug
   include EventsHelper
 end
 
-describe EventsHelper, "given an address_kind" do
+describe EventsHelper, "given an address_kind", dbclean: :after_each do
 
   subject { EventsHelperSlug.new }
 
@@ -26,104 +28,160 @@ describe EventsHelper, "given an address_kind" do
     end
   end
 
-  describe "is_initial_or_conversion_employer?" do
+  describe "employer_plan_years" do
+    
+    include_context "setup benefit market with market catalogs and product packages"
+    include_context "setup renewal application"
 
-    let(:active_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "active") }
-    let(:renewing_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "renewing_enrolling") }
-    let(:employer_profile1){ FactoryGirl.create(:employer_profile, plan_years: [active_plan_year]) }
-    let(:employer_profile2){ FactoryGirl.create(:employer_profile, plan_years: [renewing_plan_year]) }
+    context "initial employer" do
+      context "day is after open enrollment of this month" do
+        let(:current_date_of_record) { TimeKeeper.date_of_record.at_beginning_of_month + 21.days }
 
-    it "should return true if employer is initial" do
-      expect(subject.is_initial_or_conversion_employer?(employer_profile1)).to eq true
+        before do
+          predecessor_application.update_attributes({:aasm_state => "enrollment_eligible"})
+          allow(TimeKeeper).to receive(:date_of_record).and_return(current_date_of_record)
+        end
+
+        it "should return active plan year" do
+          expect(subject.employer_plan_years(abc_profile)).to eq [predecessor_application]
+        end
+      end
+
+      context "day is before open enrollment of this month" do
+        let(:current_date_of_record) { TimeKeeper.date_of_record.at_beginning_of_month }
+
+        before do
+          predecessor_application.update_attributes({:aasm_state => "draft"})
+          allow(TimeKeeper).to receive(:date_of_record).and_return(current_date_of_record)
+        end
+
+        it "should not return plan years" do
+          expect(subject.employer_plan_years(abc_profile)).to eq []
+        end
+      end
     end
 
-    it "should return false if employer is not initial" do
-      expect(subject.is_initial_or_conversion_employer?(employer_profile2)).to eq false
+    context "renewal employer" do
+
+      context "day is after open enrollment this month" do
+
+        before do
+          predecessor_application.update_attributes({:aasm_state => "active"})
+          renewal_application.update_attributes({:aasm_state => "enrollment_eligible"})
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month+ 21.days)
+        end
+
+        it "should return active and renewal plan year" do
+          expect(subject.employer_plan_years(abc_profile)).to eq [renewal_application,predecessor_application]
+        end
+      end
+
+      context "day is before open enrollment this month" do
+
+        before do
+          predecessor_application.update_attributes({:aasm_state => "active"})
+          renewal_application.update_attributes({:aasm_state => "draft"})
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month)
+        end
+
+        it "should return active plan year" do
+          expect(subject.employer_plan_years(abc_profile)).to eq [predecessor_application]
+        end
+      end
     end
 
-    it "should return true if employer is conversion has one active plan year & registered_on date not b/w active plan year start and end date" do
-      employer_profile1.profile_source='conversion'
-      employer_profile1.registered_on=TimeKeeper.date_of_record-1.year
-      employer_profile1.save
-      expect(subject.is_initial_or_conversion_employer?(employer_profile1)).to eq true
-    end
-  end
+    context "conversion employer with no external plan year" do
 
+      before do
+        allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month+ 21.days)
+        predecessor_application.update_attributes({:aasm_state => "enrollment_eligible"})
+      end
 
-  describe "is_renewal_employer?" do
-    let(:active_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "active") }
-    let(:renewing_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "renewing_enrolling") }
-    let(:employer_profile){ FactoryGirl.create(:employer_profile, plan_years: [renewing_plan_year,active_plan_year]) }
+      context "day is after open enrollment this month" do
 
-    it "should return true if employer is renewal_employer" do
-      expect(subject.is_renewal_employer?(employer_profile)).to eq true
-    end
+        it "should return active plan year" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq [predecessor_application]
+        end
+      end
 
-    it "should return false if employer is not renewal_employer" do
-      employer_profile.profile_source='conversion'
-      employer_profile.save
-      expect(subject.is_renewal_employer?(employer_profile)).to eq false
-    end
-  end
+      context "day is before open enrollment this month" do
 
-  describe "is_new_conversion_employer?" do
-    let(:active_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "active", is_conversion: true) }
-    let(:renewing_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "renewing_enrolling") }
-    let(:employer_profile){ FactoryGirl.create(:employer_profile, plan_years: [renewing_plan_year,active_plan_year]) }
+        before do
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month)
+          predecessor_application.update_attributes({:aasm_state => "draft"})
+        end
 
-    it "should return false if employer is not conversion_employer" do
-      expect(subject.is_new_conversion_employer?(employer_profile)).to eq false
+        it "should not return plan years" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq []
+        end
+      end
     end
 
-    it "should return true if employer is new conversion_employer" do
-      employer_profile.profile_source='conversion'
-      employer_profile.save
-      expect(subject.is_new_conversion_employer?(employer_profile)).to eq true
-    end
-  end
+    context "new conversion employer" do
 
-  describe "is_renewing_conversion_employer?" do
-    let(:active_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "active") }
-    let(:renewing_plan_year){ FactoryGirl.build(:plan_year, aasm_state: "renewing_enrolling") }
-    let(:employer_profile2){ FactoryGirl.create(:employer_profile,profile_source:'conversion', plan_years: [renewing_plan_year,active_plan_year]) }
-    let(:employer_profile1){ FactoryGirl.create(:employer_profile,profile_source:'conversion', plan_years: [active_plan_year]) }
+      context "day is after open enrollment this month" do
+        before do
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month+ 21.days)
+          predecessor_application.update_attributes({:aasm_state => "active"})
+          renewal_application.update_attributes({:aasm_state => "enrollment_eligible"})
+        end
 
-    it "should return false if conversion employer renewing has only active plan year" do
-      expect(subject.is_renewing_conversion_employer?(employer_profile1)).to eq false
-    end
+        it "should return active and renewal plan year" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq [renewal_application,predecessor_application]
+        end
+      end
 
-    it "should return true if conversion employer renewing" do
-      employer_profile2.registered_on=TimeKeeper.date_of_record-1.year
-      employer_profile2.save
-      expect(subject.is_renewing_conversion_employer?(employer_profile2)).to eq true
-    end
-  end
+      context "day is before open enrollment this month" do
 
-  describe "is_renewal_or_conversion_employer?" do
+        before do
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month)
+          predecessor_application.update_attributes({:aasm_state => "draft"})
+        end
 
-    let(:employer_profile){ FactoryGirl.create(:employer_profile) }
-
-    it "should return true if employer is renewal employer" do
-      allow(subject).to receive(:is_renewal_employer?).with(employer_profile).and_return true
-      expect(subject.is_renewal_or_conversion_employer?(employer_profile)).to eq true
+        it "should not return plan years" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq []
+        end
+      end
     end
 
-    it "should return fasle if employer is not renewal employer" do
-      allow(subject).to receive(:is_renewal_employer?).with(employer_profile).and_return false
-      expect(subject.is_renewal_or_conversion_employer?(employer_profile)).to eq false
-    end
-    it "should return true if employer new_conversion_employer" do
-      allow(subject).to receive(:is_new_conversion_employer?).with(employer_profile).and_return true
-      expect(subject.is_renewal_or_conversion_employer?(employer_profile)).to eq true
-    end
+    context "conversion employer renewing" do
 
-    it "should return false if employer is not new_conversion_employer" do
-      allow(subject).to receive(:is_new_conversion_employer?).with(employer_profile).and_return false
-      expect(subject.is_renewal_or_conversion_employer?(employer_profile)).to eq false
-    end
-    it "should return true if employer is renewing conversion employer" do
-      allow(subject).to receive(:is_renewing_conversion_employer?).with(employer_profile).and_return true
-      expect(subject.is_renewal_or_conversion_employer?(employer_profile)).to eq true
+      context "day is after open enrollment this month" do
+
+        before do
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month+ 21.days)
+          predecessor_application.update_attributes({:aasm_state => "active"})
+          renewal_application.update_attributes({:aasm_state => "enrollment_eligible"})
+        end
+
+        it "should return active and renewal plan year" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq [renewal_application,predecessor_application]
+        end
+      end
+
+      context "day is before open enrollment this month" do
+
+        before do
+          allow(TimeKeeper).to receive(:date_of_record).and_return(TimeKeeper.date_of_record.at_beginning_of_month)
+          predecessor_application.update_attributes({:aasm_state => "enrollment_eligible"})
+        end
+
+        it "should return active_plan_year" do
+          abc_profile.benefit_applications.first.benefit_sponsorship.source_kind = "conversion"
+          abc_profile.save
+          expect(subject.employer_plan_years(abc_profile)).to eq [predecessor_application]
+        end
+      end
     end
   end
 
@@ -202,108 +260,62 @@ describe EventsHelper, "transforming a qualifying event kind for external xml" d
 
 end
 
-describe EventsHelper, "selecting plan years to be exported" do
+describe EventsHelper, "selecting plan years to be exported", dbclean: :after_each do
   subject { EventsHelperSlug.new }
 
   describe "plan_years_for_manual_export" do
-    let (:employer_profile) { FactoryGirl.create(:employer_with_planyear) }
-    let (:ren_employer_profile) { FactoryGirl.create(:employer_with_renewing_planyear) }
-    let (:plan_year) { employer_profile.plan_years.first }
-    let (:act_plan_year) { ren_employer_profile.plan_years.first }
-    let (:ren_plan_year) { ren_employer_profile.plan_years.last }
 
+    include_context "setup benefit market with market catalogs and product packages"
+    include_context "setup renewal application"
 
     context "draft plan year" do
       before do
-        plan_year.update_attributes({:aasm_state => "draft"})
+        predecessor_application.update_attributes({:aasm_state => "draft"})
       end
 
       it "should return []" do
-        expect(subject.plan_years_for_manual_export(employer_profile)).to eq []
+        expect(subject.plan_years_for_manual_export(abc_profile)).to eq []
       end
     end
 
     context "enrolled plan year" do
       before do
-        plan_year.update_attributes({:aasm_state => "enrolled"})
+        predecessor_application.update_attributes({:aasm_state => "enrollment_eligible"})
       end
 
       it "should return the plan year" do
-        expect(subject.plan_years_for_manual_export(employer_profile)).to eq [plan_year]
+        expect(subject.plan_years_for_manual_export(abc_profile)).to eq [predecessor_application]
       end
     end
 
     context "terminated plan year with future date of termination" do
       before do
-        plan_year.update_attributes({:terminated_on => TimeKeeper.date_of_record + 1.month,
+        predecessor_application.update_attributes({:terminated_on => TimeKeeper.date_of_record + 1.month,
                                      :aasm_state => "terminated"})
       end
 
       it "should return the plan year" do
-        expect(subject.plan_years_for_manual_export(employer_profile)).to eq [plan_year]
+        expect(subject.plan_years_for_manual_export(abc_profile)).to eq [predecessor_application]
       end
     end
 
     context "expired plan year" do
       before do
-        plan_year.update_attributes({:aasm_state => "expired"})
+        predecessor_application.update_attributes({:aasm_state => "expired"})
       end
 
       it "should return the expired plan year" do
-        expect(subject.plan_years_for_manual_export(employer_profile)).to eq [plan_year]
+        expect(subject.plan_years_for_manual_export(abc_profile)).to eq [predecessor_application]
       end
     end
 
     context "active and canceled plan year" do
       before do
-        ren_plan_year.update_attributes({:aasm_state => "renewing_canceled"})
+        renewal_application.update_attributes({:aasm_state => "renewing_canceled"})
       end
 
       it "should not return the plan year" do
-        expect(subject.plan_years_for_manual_export(ren_employer_profile)).to eq [act_plan_year]
-      end
-    end
-  end
-end
-
-describe EventsHelper, "employer_plan_years" do
-  subject { EventsHelperSlug.new }
-
-  describe "should export valid plan years" do
-    let(:terminated_plan_year)         { FactoryGirl.build(:plan_year, start_on:TimeKeeper.date_of_record.beginning_of_month+ 1.month - 1.year, aasm_state:'terminated')}
-    let(:active_plan_year)         { FactoryGirl.build(:plan_year, start_on:TimeKeeper.date_of_record.beginning_of_month+ 1.month - 1.year, aasm_state:'active')}
-    let(:renewing_plan_year)         { FactoryGirl.build(:plan_year, start_on:TimeKeeper.date_of_record.beginning_of_month + 1.months, aasm_state:'renewing_enrolled')}
-    let(:canceled_plan_year)         { FactoryGirl.build(:plan_year, start_on:TimeKeeper.date_of_record.beginning_of_month + 1.months, aasm_state:'renewing_canceled')}
-    let(:employer_profile){ FactoryGirl.create(:employer_profile, plan_years: [active_plan_year, renewing_plan_year]) }
-
-
-    context "employer with active and renewing enrolled plan year" do
-      it "should return active and renewing plan year" do
-        allow(renewing_plan_year).to receive(:open_enrollment_completed?).and_return true
-        allow(renewing_plan_year).to receive(:past_transmission_threshold?).and_return true
-        expect(subject.employer_plan_years(employer_profile, nil)).to eq [active_plan_year, renewing_plan_year]
-      end
-    end
-
-    context "employer with active and canceled plan year" do
-      let(:employer_profile){ FactoryGirl.create(:employer_profile, plan_years: [active_plan_year, canceled_plan_year]) }
-
-      it "should return active plan year when canceled plan id not passed to export" do
-        expect(subject.employer_plan_years(employer_profile, nil)).to eq [active_plan_year]
-      end
-
-      context "when canceled plan year id passed to export" do
-        it "should return active & canceled plan year" do
-          expect(subject.employer_plan_years(employer_profile, canceled_plan_year.id.to_s)).to eq [active_plan_year, canceled_plan_year]
-        end
-      end
-    end
-
-    context "employer with terminated plan year" do
-      let(:employer_profile){ FactoryGirl.create(:employer_profile, plan_years: [terminated_plan_year]) }
-
-      it "should return terminated plan year" do
-        expect(subject.employer_plan_years(employer_profile, nil)).to eq [terminated_plan_year]
+        expect(subject.plan_years_for_manual_export(abc_profile)).to eq [predecessor_application]
       end
     end
   end
