@@ -2,7 +2,7 @@ module Insured
   module GroupSelectionHelper
 
     def can_shop_individual?(person)
-      person.present? && person.is_consumer_role_active?
+      person.try(:has_active_consumer_role?)
     end
 
     def can_shop_shop?(person)
@@ -14,13 +14,7 @@ module Insured
     end
 
     def can_shop_resident?(person)
-      person.present? && person.is_resident_role_active?
-    end
-
-    def can_shop_individual_or_resident?(person)
-      return true if (can_shop_individual?(person) && person.has_active_resident_member?)
-      return true if (can_shop_resident?(person) && person.has_active_consumer_member?)
-      return false
+      person.try(:has_active_resident_role?)
     end
 
     def health_relationship_benefits(benefit_group)
@@ -53,29 +47,17 @@ module Insured
         benefit_sponsorship: HbxProfile.current_hbx.try(:benefit_sponsorship))
     end
 
-    def  view_market_places(person)
-      if can_shop_both_markets?(person)
-        Plan::MARKET_KINDS
-      elsif can_shop_individual_or_resident?(person)
-        Plan::INDIVIDUAL_MARKET_KINDS
-      elsif can_shop_individual?(person)
-        ["individual"]
-      elsif can_shop_resident?(person)
-        ["coverall"]
-      end
-    end
-
     def select_market(person, params)
       return params[:market_kind] if params[:market_kind].present?
-      if params[:qle_id].present? && (!person.is_resident_role_active?)
+      if params[:qle_id].present? && (!person.has_active_resident_role?)
         qle = QualifyingLifeEventKind.find(params[:qle_id])
         return qle.market_kind
       end
-      if (person.has_active_employee_role? && person.has_employer_benefits?)
+      if person.has_active_employee_role?
         'shop'
-      elsif person.is_consumer_role_active?
+      elsif person.has_active_consumer_role? && !person.has_active_resident_role?
         'individual'
-      elsif person.is_resident_role_active?
+      elsif person.has_active_resident_role?
         'coverall'
       else
         nil
@@ -110,7 +92,7 @@ module Insured
       enrollments = family.active_household.hbx_enrollments
       if plan_year.present? && plan_year.is_renewing?
         renewal_enrollment(enrollments, employee_role)
-      elsif py.is_published?
+      else
         active_enrollment(enrollments, employee_role)
       end
     end
@@ -134,25 +116,17 @@ module Insured
       employee_role.census_employee.renewal_benefit_group_assignment : (benefit_group.plan_year.aasm_state == "expired" && (change_plan == 'change_by_qle' or enrollment_kind == 'sep')) ? employee_role.census_employee.benefit_group_assignments.where(benefit_group_id: benefit_group.id).first : employee_role.census_employee.active_benefit_group_assignment
     end
 
-    def is_market_kind_disabled?(kind, primary)
-      unless can_shop_individual_or_resident?(primary)
-        if @mc_market_kind.present?
-          @mc_market_kind != kind
-        else
-          @disable_market_kind == kind
-        end
+    def is_market_kind_disabled?(kind)
+      if @mc_market_kind.present?
+        @mc_market_kind != kind
+      else
+        @disable_market_kind == kind
       end
     end
 
-    def is_market_kind_checked?(kind, primary)
+    def is_market_kind_checked?(kind)
       if @mc_market_kind.present?
         @mc_market_kind == kind
-      elsif can_shop_individual_or_resident?(primary) && !(primary.has_active_employee_role?)
-        kind == "individual"
-      elsif primary.is_consumer_role_active? && !(primary.has_active_employee_role?)
-        kind == "individual"
-      elsif primary.is_resident_role_active? && !(primary.has_active_employee_role?)
-        kind == "coverall"
       else
         @market_kind == kind
       end

@@ -16,16 +16,8 @@ class HbxIdGenerator
     provider.generate_policy_id
   end
 
-  def generate_payment_transaction_id
-    provider.generate_payment_transaction_id
-  end
-
   def generate_organization_id
     provider.generate_organization_id
-  end
-
-  def generate_application_id
-    provider.generate_application_id
   end
 
   def self.slug!
@@ -36,20 +28,12 @@ class HbxIdGenerator
     self.instance.generate_policy_id
   end
 
-  def self.generate_payment_transaction_id
-    self.instance.generate_payment_transaction_id
-  end
-
   def self.generate_member_id
     self.instance.generate_member_id
   end
 
   def self.generate_organization_id
     self.instance.generate_organization_id
-  end
-
-  def self.generate_application_id
-    self.instance.generate_application_id
   end
 
   class AmqpSource
@@ -71,16 +55,8 @@ class HbxIdGenerator
       generate_id_from_sequence("policy_id")
     end
 
-    def self.generate_payment_transaction_id
-      generate_id_from_sequence("payment_transaction_id")
-    end
-
     def self.generate_organization_id
       generate_id_from_sequence("organization_id")
-    end
-
-    def self.generate_application_id
-      generate_id_from_sequence("faa_application_id")
     end
   end
 
@@ -93,20 +69,12 @@ class HbxIdGenerator
       random_uuid
     end
 
-    def self.generate_payment_transaction_id
-      random_uuid
-    end
-
     def self.generate_member_id
       random_uuid
     end
 
     def self.random_uuid
       SecureRandom.uuid.gsub("-","")
-    end
-
-    def self.generate_application_id
-      random_uuid
     end
   end
 end

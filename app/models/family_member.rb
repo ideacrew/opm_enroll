@@ -4,8 +4,6 @@ class FamilyMember
   include Mongoid::Timestamps
   include MongoidSupport::AssociationProxies
 
-  after_create :create_financial_assistance_applicant
-
   embedded_in :family
 
   # Person responsible for this family
@@ -88,15 +86,6 @@ class FamilyMember
     # TODO parent.households.coverage_households.where()
   end
 
-  def aptc_benchmark_amount
-    benefit_sponsorship = HbxProfile.current_hbx.benefit_sponsorship
-    benefit_coverage_period = benefit_sponsorship.benefit_coverage_periods.detect {|bcp| bcp.contains?(TimeKeeper.datetime_of_record)}
-    slcsp = benefit_coverage_period.second_lowest_cost_silver_plan
-    ehb = benefit_coverage_period.second_lowest_cost_silver_plan.ehb
-    cost = slcsp.premium_for(TimeKeeper.datetime_of_record, person.age_on(TimeKeeper.datetime_of_record))
-    cost * ehb
-  end
-
   def broker=(new_broker)
     return unless new_broker.is_a? BrokerRole
     self.broker_role_id = new_broker._id
@@ -126,7 +115,7 @@ class FamilyMember
     if is_primary_applicant?
       "self"
     else
-      person.find_relationship_with(family.primary_applicant_person, self.family_id) unless family.primary_applicant_person.blank? || person.blank?
+      family.primary_applicant_person.find_relationship_with(person) unless family.primary_applicant_person.blank? || person.blank?
     end
   end
 
@@ -135,8 +124,15 @@ class FamilyMember
   end
 
   def reactivate!(relationship)
-    family.primary_applicant_person.ensure_relationship_with(person, relationship, family.id)
+    family.primary_applicant_person.ensure_relationship_with(person, relationship)
     family.add_family_member(person)
+  end
+
+  def update_relationship(relationship)
+    return if (primary_relationship == relationship)
+    family.remove_family_member(person)
+    self.reactivate!(relationship)
+    family.save!
   end
 
   def self.find(family_member_id)
@@ -145,25 +141,7 @@ class FamilyMember
     family.family_members.detect { |member| member._id.to_s == family_member_id.to_s } unless family.blank?
   end
 
-  def create_financial_assistance_applicant
-    # If there is an application in progress create an applicant for the added family member.
-    if family.applications.present?
-      if family.application_in_progress.present?
-        family.application_in_progress.applicants.create!({family_member_id: self.id}) unless self.is_primary_applicant?
-      end
-    end
-  end
-
-  def applicant_of_application(application)
-    return nil unless application
-    application.active_applicants.where(family_member_id: self.id).first
-  end
-
-  def applicant_for_verification
-    applicant_of_application(family.latest_applicable_submitted_application)
-  end
-
-  private
+  private 
 
   def no_duplicate_family_members
     return unless family

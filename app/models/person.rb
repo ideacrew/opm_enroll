@@ -31,8 +31,7 @@ class Person
                         :race,
                         :tribal_id,
                         :no_dc_address,
-                        :is_homeless,
-                        :is_temporarily_out_of_state,
+                        :no_dc_address_reason,
                         :is_active,
                         :no_ssn],
                 :modifier_field => :modifier,
@@ -54,8 +53,6 @@ class Person
   PERSON_CREATED_EVENT_NAME = "acapi.info.events.individual.created"
   PERSON_UPDATED_EVENT_NAME = "acapi.info.events.individual.updated"
   VERIFICATION_TYPES = ['Social Security Number', 'American Indian Status', 'Citizenship', 'Immigration status']
-
-  NON_SHOP_ROLES = ['Individual','Coverall']
 
   field :hbx_id, type: String
   field :name_pfx, type: String
@@ -85,18 +82,14 @@ class Person
   field :language_code, type: String
 
   field :no_dc_address, type: Boolean, default: false
-  field :is_homeless, type: Boolean, default: false
-  field :is_temporarily_out_of_state, type: Boolean, default: false
+  field :no_dc_address_reason, type: String, default: ""
 
   field :is_active, type: Boolean, default: true
   field :updated_by, type: String
   field :no_ssn, type: String #ConsumerRole TODO TODOJF
   field :is_physically_disabled, type: Boolean
 
-
   delegate :is_applying_coverage, to: :consumer_role, allow_nil: true
-  delegate :is_native?, to: :consumer_role, allow_nil: true
-
 
   # Login account
   belongs_to :user
@@ -118,8 +111,6 @@ class Person
 
   embeds_one :consumer_role, cascade_callbacks: true, validate: true
   embeds_one :resident_role, cascade_callbacks: true, validate: true
-  embeds_many :individual_market_transitions, cascade_callbacks: true, validate: true
-
   embeds_one :broker_role, cascade_callbacks: true, validate: true
   embeds_one :hbx_staff_role, cascade_callbacks: true, validate: true
   #embeds_one :responsible_party, cascade_callbacks: true, validate: true # This model does not exist.
@@ -138,7 +129,6 @@ class Person
   embeds_many :phones, cascade_callbacks: true, validate: true
   embeds_many :emails, cascade_callbacks: true, validate: true
   embeds_many :documents, as: :documentable
-  embeds_many :verification_types, cascade_callbacks: true, validate: true
 
   accepts_nested_attributes_for :consumer_role, :resident_role, :broker_role, :hbx_staff_role,
     :person_relationships, :employee_roles, :phones, :employer_staff_roles
@@ -208,9 +198,7 @@ class Person
   index({"hbx_staff_role.is_active" => 1})
 
   # PersonRelationship child model indexes
-  # index({"person_relationship.relative_id" =>  1}) #old_code
-  index({"person_relationship.predecessor_id" =>  1})
-  index({"person_relationship.successor_id" =>  1})
+  index({"person_relationship.relative_id" =>  1})
 
   index({"hbx_employer_staff_role._id" => 1})
 
@@ -223,7 +211,6 @@ class Person
   scope :all_resident_roles,          -> { exists(resident_role: true) }
   scope :all_employee_roles,          -> { exists(employee_roles: true) }
   scope :all_employer_staff_roles,    -> { exists(employer_staff_roles: true) }
-  scope :all_individual_market_transitions,  -> { exists(individual_market_transitions: true) }
 
   #scope :all_responsible_party_roles, -> { exists(responsible_party_role: true) }
   scope :all_broker_roles,            -> { exists(broker_role: true) }
@@ -251,9 +238,6 @@ class Person
   scope :general_agency_staff_certified,     -> { where("general_agency_staff_roles.aasm_state" => { "$eq" => :active })}
   scope :general_agency_staff_decertified,   -> { where("general_agency_staff_roles.aasm_state" => { "$eq" => :decertified })}
   scope :general_agency_staff_denied,        -> { where("general_agency_staff_roles.aasm_state" => { "$eq" => :denied })}
-  scope :outstanding_identity_validation, -> { where(:'consumer_role.identity_validation' => { "$in" => [:pending] })}
-  scope :outstanding_application_validation, -> { where(:'consumer_role.application_validation' => { "$in" => [:pending] })}
-  scope :for_admin_approval, -> { any_of([outstanding_identity_validation.selector, outstanding_application_validation.selector]) }
 #  ViewFunctions::Person.install_queries
 
   validate :consumer_fields_validations
@@ -367,14 +351,13 @@ class Person
     @full_name = [name_pfx, first_name, middle_name, last_name, name_sfx].compact.join(" ")
   end
 
-  def first_name_last_name_and_suffix(seperator=nil)
-    seperator = seperator.present? ? seperator : " "
-    [first_name, last_name, name_sfx].compact.join(seperator)
+  def first_name_last_name_and_suffix
+    [first_name, last_name, name_sfx].compact.join(" ")
     case name_sfx
       when "ii" ||"iii" || "iv" || "v"
-        [first_name.capitalize, last_name.capitalize, name_sfx.upcase].compact.join(seperator)
+        [first_name.capitalize, last_name.capitalize, name_sfx.upcase].compact.join(" ")
       else
-        [first_name.capitalize, last_name.capitalize, name_sfx].compact.join(seperator)
+        [first_name.capitalize, last_name.capitalize, name_sfx].compact.join(" ")
       end
   end
 
@@ -382,104 +365,51 @@ class Person
     is_active
   end
 
-  def is_homeless?
-    is_homeless
-  end
-
-  def is_temporarily_out_of_state?
-    is_temporarily_out_of_state
-  end
-
-  def deactivate_types(types)
-    types.each do |type|
-      verification_type_by_name(type).update_attributes(:inactive => true) unless verification_type_by_name(type).inactive
-    end
-  end
-
-  def add_new_verification_type(new_type)
-    default_status = (new_type == "DC Residency" && (consumer_role || resident_role) && age_on(TimeKeeper.date_of_record) < 18) ? "attested" : "unverified"
-    if verification_types.map(&:type_name).include? new_type
-      verification_type_by_name(new_type).update_attributes(:inactive => false)
+  # collect all verification types user can have based on information he provided
+  def verification_types
+    verification_types = []
+    verification_types << 'DC Residency'
+    verification_types << 'Social Security Number' if ssn
+    verification_types << 'American Indian Status' if !(tribal_id.nil? || tribal_id.empty?)
+    if self.us_citizen
+      verification_types << 'Citizenship'
     else
-      verification_types << VerificationType.new(:type_name => new_type, :validation_status => default_status ) if !(us_citizen.nil?)
+      verification_types << 'Immigration status'
     end
+    verification_types
   end
 
-  def verification_type_by_name(type)
-    verification_types.find_by(:type_name => type)
+  def relatives
+    person_relationships.reject do |p_rel|
+      p_rel.relative_id.to_s == self.id.to_s
+    end.map(&:relative)
   end
 
-# collect all ridp_verification_types user in case of unsuccessful ridp
-  def ridp_verification_types
-    ridp_verification_types = []
-    ridp_verification_types << 'Identity' if consumer_role  && !consumer_role.person.completed_identity_verification?
-    ridp_verification_types << 'Application' if consumer_role && !consumer_role.person.completed_identity_verification?
-    ridp_verification_types
-  end
-
-  def all_verification_types(family_id)
-    family = Family.where(id: family_id).first
-    if family.present? && family.has_financial_assistance_verification? && has_faa_application?(family)
-      verifications = verification_types + ["Income", "MEC"]
-    else
-      verifications = verification_types
-    end
-
-    return verifications
-  end
-
-  def has_faa_application?(family)
-    member = family.family_members.where(person_id: id).first
-    family.latest_applicable_submitted_application.applicants.where(family_member_id: member.id).first.present?
-  end
-
-  def relatives(family_id)
-    person_relationships.where(family_id: family_id).map(&:relative)
-    # person_relationships.reject do |p_rel|
-    #   p_rel.relative_id.to_s == self.id.to_s
-    # end.map(&:relative)
-  end
-
-  def find_relationship_with(other_person, family_id)
+  def find_relationship_with(other_person)
     if self.id == other_person.id
       "self"
     else
-      person_relationship_for(other_person, family_id).try(:kind)
+      person_relationship_for(other_person).try(:kind)
     end
   end
 
-  def person_relationship_for(other_person, family_id)
-    person_relationships.where(successor_id: other_person.id, predecessor_id: self.id, family_id: family_id).first
-    # person_relationships.detect do |person_relationship|
-    #   person_relationship.relative_id == other_person.id
-    # end
+  def person_relationship_for(other_person)
+    person_relationships.detect do |person_relationship|
+      person_relationship.relative_id == other_person.id
+    end
   end
 
-  def ensure_relationship_with(person, relationship, family_id)
+  def ensure_relationship_with(person, relationship)
     return if person.blank?
-    # existing_relationship = self.person_relationships.detect do |rel|
-    #   rel.relative_id.to_s == person.id.to_s
-    # end
-    direct_relationship = person_relationships.where(family_id: family_id, predecessor_id: self.id, successor_id: person.id).first
-    inverse_relationship = person.person_relationships.where(family_id: family_id, predecessor_id: person.id, successor_id: self.id).first
-    if direct_relationship.present? && inverse_relationship.present?
-      direct_relationship.update_attributes(:kind => PersonRelationship::InverseMap[relationship])
-      inverse_relationship.update_attributes(:kind => relationship)
-      # existing_relationship.update_attributes(:kind => relationship)
+    existing_relationship = self.person_relationships.detect do |rel|
+      rel.relative_id.to_s == person.id.to_s
+    end
+    if existing_relationship
+      existing_relationship.update_attributes(:kind => relationship)
     else
       self.person_relationships << PersonRelationship.new({
-        :kind => PersonRelationship::InverseMap[relationship],
-        # :relative_id => person.id,
-        :successor_id => person.id,
-        :predecessor_id => self.id,
-        :family_id => family_id
-      })
-      person.person_relationships << PersonRelationship.new({
         :kind => relationship,
-        # :relative_id => person.id,
-        :successor_id => self.id,
-        :predecessor_id => person.id,
-        :family_id => family_id
+        :relative_id => person.id
       })
     end
   end
@@ -540,27 +470,11 @@ class Person
   end
 
   def has_active_consumer_role?
-     consumer_role.present? && consumer_role.is_active?
+    consumer_role.present? and consumer_role.is_active?
   end
 
   def has_active_resident_role?
-    resident_role.present? && resident_role.is_active?
-  end
-
-  def has_active_resident_member?
-    if self.primary_family.present?
-      active_resident_member = self.primary_family.active_family_members.detect { |member| member.person.is_resident_role_active? }
-      return true if active_resident_member.present?
-    end
-    return false
-  end
-
-  def has_active_consumer_member?
-    if self.primary_family.present?
-      active_consumer_member = self.primary_family.active_family_members.detect { |member| member.person.is_consumer_role_active? }
-      return true if active_consumer_member.present?
-    end
-    return false
+    resident_role.present? and resident_role.is_active?
   end
 
   def can_report_shop_qle?
@@ -602,44 +516,16 @@ class Person
   end
 
   def residency_eligible?
-    no_dc_address and  (is_homeless? || is_temporarily_out_of_state?)
+    no_dc_address and no_dc_address_reason.present?
   end
 
   def is_dc_resident?
-    return false if no_dc_address == true && (is_homeless? && is_temporarily_out_of_state?)
-    return true if no_dc_address == true && (is_homeless? || is_temporarily_out_of_state?)
+    return false if no_dc_address == true && no_dc_address_reason.blank?
+    return true if no_dc_address == true && no_dc_address_reason.present?
 
     address_to_use = addresses.collect(&:kind).include?('home') ? 'home' : 'mailing'
     addresses.each{|address| return true if address.kind == address_to_use && address.state == aca_state_abbreviation}
     return false
-  end
-
-  def current_individual_market_transition
-    if self.individual_market_transitions.present?
-      self.individual_market_transitions.last
-    else
-      nil
-    end
-  end
-
-  def active_individual_market_role
-    if current_individual_market_transition.present? && current_individual_market_transition.role_type
-      current_individual_market_transition.role_type
-    else
-      nil
-    end
-  end
-
-  def has_consumer_or_resident_role?
-    is_consumer_role_active? || is_resident_role_active?
-  end
-
-  def is_consumer_role_active?
-    (self.consumer_role.present? && self.active_individual_market_role == "consumer") ? true : false
-  end
-
-  def is_resident_role_active?
-    (self.resident_role.present? && self.active_individual_market_role == "resident") ? true : false
   end
 
   class << self
@@ -963,54 +849,7 @@ class Person
     end
   end
 
-  # Related to Relationship Matrix
-  def add_relationship(successor, relationship_kind, family_id, destroy_relation=false)
-    if same_successor_exists?(successor, family_id)
-      direct_relationship = person_relationships.where(family_id: family_id, predecessor_id: self.id, successor_id: successor.id).first # Direct Relationship
-
-      # Destroying the relationships associated to the Person other than the new updated relationship.
-      if direct_relationship != nil && destroy_relation
-        other_relations = person_relationships.where(family_id: family_id, predecessor_id: self.id, :id.nin =>[direct_relationship.id]).map(&:successor_id)
-        person_relationships.where(family_id: family_id, predecessor_id: self.id, :id.nin =>[direct_relationship.id]).each(&:destroy)
-
-        other_relations.each do |otr|
-          otr_relation = Person.find(otr).person_relationships.where(family_id: family_id, predecessor_id: otr, successor_id: self.id).first
-          otr_relation.destroy unless otr_relation.blank?
-        end
-      end
-
-      direct_relationship.update(kind: relationship_kind)
-    else
-      if self.id != successor.id
-        person_relationships.create(family_id: family_id, predecessor_id: self.id, successor_id: successor.id, kind: relationship_kind) # Direct Relationship
-      end
-    end
-  end
-
-  def build_relationship(successor, relationship_kind, family_id)
-    person_relationships.build(family_id: family_id, predecessor_id: self.id, successor_id: successor.id, kind: relationship_kind) # Direct Relationship
-  end
-
-  def remove_relationship(family_id)
-    successor_ids = person_relationships.where(family_id: family_id, predecessor_id: self.id).collect(&:successor_id)
-    person_relationships.where(family_id: family_id, predecessor_id: self.id).each(&:destroy)
-    successor_ids.each do |s|
-      Person.find(s).person_relationships.where(family_id: family_id, successor_id: self.id).each(&:destroy)
-    end
-  end
-
-  def same_successor_exists?(successor, family_id)
-    person_relationships.where(family_id: family_id, predecessor_id: self.id, successor_id: successor.id).first.present?
-  end
-
   private
-
-  def is_only_one_individual_role_active?
-    if self.is_consumer_role_active? && self.is_resident_role_active?
-      self.errors.add(:base, "Resident role and Consumer role can't both be active at the same time.")
-    end
-    true
-  end
 
   def create_inbox
     welcome_subject = "Welcome to #{site_short_name}"

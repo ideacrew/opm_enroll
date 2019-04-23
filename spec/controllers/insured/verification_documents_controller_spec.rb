@@ -2,9 +2,6 @@ require 'rails_helper'
 
 if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
 RSpec.describe Insured::VerificationDocumentsController, :type => :controller do
-  before :each do
-    allow_any_instance_of(FinancialAssistance::Application).to receive(:set_benchmark_plan_id)
-  end
   let(:user) { FactoryGirl.create(:user) }
   let(:person) { FactoryGirl.build(:person, :with_consumer_role) }
   let(:consumer_role) { {consumer_role: ''} }
@@ -65,29 +62,27 @@ RSpec.describe Insured::VerificationDocumentsController, :type => :controller do
 
     describe "file upload" do
       let(:file) { [:temp_file] }
-      let(:person) { FactoryGirl.create(:person, :with_family, :with_consumer_role) }
+      let(:person) { FactoryGirl.create(:person, :with_consumer_role) }
       let(:temp_file) { double }
       let(:consumer_role_params) {}
-      let(:params) { {person: {consumer_role: person.consumer_role},family_member: person.primary_family.primary_applicant.id.to_s, file: file} }
+      let(:params) { {person: {consumer_role: person.consumer_role}, file: file} }
       let(:bucket_name) { 'id-verification' }
       let(:doc_uri) { "doc_uri" }
       let(:file_path) { 'temp_file' } # a sample file path
-      let!(:tax_household1) { FactoryGirl.create(:tax_household, household: person.primary_family.households.first) }
-      let!(:applicant) { FactoryGirl.create(:applicant, application: application, tax_household_id: tax_household1.id, family_member_id: person.primary_family.primary_applicant.id) }
-      let!(:application) { FactoryGirl.create(:application, family: person.primary_family, aasm_state: "submitted") }
+      let(:family) { double("Family", :update_family_document_status! => true)}
 
       before do
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:find_docs_owner).and_return(person)
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:get_family)
-        allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:add_type_history_element)
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:set_current_person).and_return(person)
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:person_consumer_role)
         allow(Aws::S3Storage).to receive(:save).with(file_path, bucket_name).and_return(doc_uri)
+
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:file_path).with('temp_file').and_return(file_path)
         allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:file_name).with('temp_file').and_return("sample-filename")
-        allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:update_vlp_documents).with("sample-filename", doc_uri,applicant).and_return(true)
-        allow(person.primary_family).to receive(:update_family_document_status!).and_return(true)
-        controller.instance_variable_set(:"@family", person.primary_family)
+        allow_any_instance_of(Insured::VerificationDocumentsController).to receive(:update_vlp_documents).with("sample-filename", doc_uri).and_return(true)
+
+        controller.instance_variable_set(:"@family", family)
         sign_in user
         post :upload, params
 

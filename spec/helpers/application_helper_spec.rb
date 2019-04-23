@@ -217,12 +217,10 @@ RSpec.describe ApplicationHelper, :type => :helper do
   end
 
   describe "relationship_options" do
-    let(:dependent) { double("Dependent") }
-    let(:family_member) {double("FamilyMember")}
+    let(:dependent) { double("FamilyMember") }
 
     context "consumer_portal" do
       it "should return correct options for consumer portal" do
-        allow(dependent).to receive(:family_member).and_return(family_member)
         expect(helper.relationship_options(dependent, "consumer_role_id")).to match(/Domestic Partner/mi)
         expect(helper.relationship_options(dependent, "consumer_role_id")).to match(/Spouse/mi)
         expect(helper.relationship_options(dependent, "consumer_role_id")).not_to match(/other tax dependent/mi)
@@ -230,13 +228,12 @@ RSpec.describe ApplicationHelper, :type => :helper do
     end
 
     context "employee portal" do
-      it "should match options that are in non_consumer portal" do
-        allow(dependent).to receive(:family_member).and_return(family_member)
+      it "should not match options that are in consumer portal" do
         expect(helper.relationship_options(dependent, "")).to match(/Domestic Partner/mi)
-        expect(helper.relationship_options(dependent, "")).to match(/Spouse/mi)
         expect(helper.relationship_options(dependent, "")).not_to match(/other tax dependent/mi)
       end
     end
+
   end
 
   describe "#may_update_census_employee?" do
@@ -544,32 +541,6 @@ end
 
     it "should raise error when non boolean values are passed" do
       expect{helper.convert_to_bool(val9)}.to raise_error(ArgumentError)
-    end
-  end
-
-  describe "can_access_pay_now_button" do
-    let!(:person1){FactoryGirl.create(:person, user: user1)}
-    let!(:user1){FactoryGirl.create(:user)}
-    let!(:hbx_staff_role1) { FactoryGirl.create(:hbx_staff_role, person: person1, subrole: "hbx_staff", permission_id: permission.id)}
-    let!(:person2){FactoryGirl.create(:person, user: user2)}
-    let!(:user2){FactoryGirl.create(:user)}
-    let!(:hbx_staff_role2) { FactoryGirl.create(:hbx_staff_role, person: person2, subrole: "hbx_read_only", permission_id: permission.id)}
-    let!(:person3){FactoryGirl.create(:person, user: user3)}
-    let!(:user3){FactoryGirl.create(:user)}
-    let!(:permission) { FactoryGirl.create(:permission)}
-
-    it "should return true when hbx staff login as admin " do
-      a = user1.person.hbx_staff_role.permission
-      expect(a.can_access_pay_now).not_to eq true
-    end
-
-    it "should return false when hbx readonly login as admin " do
-      b = user2.person.hbx_staff_role.permission
-      expect(b.can_access_pay_now).to eq false
-    end
-
-    it "should return nil when there is no staff role for person " do
-      expect(user3.person.hbx_staff_role).to eq nil
     end
   end
 end

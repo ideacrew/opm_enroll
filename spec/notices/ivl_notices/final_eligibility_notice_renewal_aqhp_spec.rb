@@ -22,33 +22,31 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalAqhp, :dbclean => :after
       :person =>  person,
       :title => "Your Final Plan Enrollment, And Remainder To Pay"})
   }
-  let(:valid_params) {{
+  let(:valid_parmas) {{
       :subject => application_event.title,
       :mpi_indicator => application_event.mpi_indicator,
       :event_name => application_event.event_name,
       :template => application_event.notice_template,
       :data => data,
-      :renewing_enrollments => [hbx_enrollment],
-      :active_enrollments => [hbx_enrollment],
+      enrollments: [hbx_enrollment],
       :person => person
   }}
 
-  before :each do
-    allow(person.consumer_role).to receive("person").and_return(person)
-  end
-
   describe "New" do
+    before do
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+    end
     context "valid params" do
       it "should initialze" do
-        expect{IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_params)}.not_to raise_error
+        expect{IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_parmas)}.not_to raise_error
       end
     end
 
     context "invalid params" do
       [:mpi_indicator,:subject,:template].each do  |key|
         it "should NOT initialze with out #{key}" do
-          valid_params.delete(key)
-          expect{IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_params)}.to raise_error(RuntimeError,"Required params #{key} not present")
+          valid_parmas.delete(key)
+          expect{IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_parmas)}.to raise_error(RuntimeError,"Required params #{key} not present")
         end
       end
     end
@@ -56,7 +54,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalAqhp, :dbclean => :after
 
   describe "#build" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_parmas)
       @final_eligibility_notice.build
     end
 
@@ -75,7 +75,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalAqhp, :dbclean => :after
 
   describe "#append_open_enrollment_data" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_parmas)
       @final_eligibility_notice.build
     end
     it "return ivl open enrollment start on" do
@@ -88,7 +90,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalAqhp, :dbclean => :after
 
   describe "#generate_pdf_notice" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalAqhp.new(person.consumer_role, valid_parmas)
     end
 
     it "should render the final eligibility notice template" do

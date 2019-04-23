@@ -28,8 +28,6 @@ class Family
   increments :hbx_assigned_id, seed: 9999
 
   field :e_case_id, type: String # Eligibility system foreign key
-  #field :fin_app_id, type: String # Financial Application ID, Use Family ID instead
-  field :haven_app_id, type: String
   field :e_status_code, type: String
   field :application_type, type: String
   field :renewal_consent_through_year, type: Integer # Authorize auto-renewal elibility check through this year (CCYY format)
@@ -40,8 +38,6 @@ class Family
   field :status, type: String, default: "" # for aptc block
   field :min_verification_due_date, type: Date, default: nil
   field :vlp_documents_status, type: String
-
-  field :is_applying_for_assistance, type: Boolean
 
   belongs_to  :person
 
@@ -56,14 +52,12 @@ class Family
   embeds_many :broker_agency_accounts, class_name: "BenefitSponsors::Accounts::BrokerAgencyAccount"
   embeds_many :general_agency_accounts
   embeds_many :documents, as: :documentable
-  has_many :applications, class_name: "FinancialAssistance::Application"
-  has_many :payment_transactions
 
   after_initialize :build_household
   before_save :clear_blank_fields
 
   accepts_nested_attributes_for :special_enrollment_periods, :family_members, :irs_groups,
-                                :households, :broker_agency_accounts, :general_agency_accounts, :applications
+                                :households, :broker_agency_accounts, :general_agency_accounts
 
   # index({hbx_assigned_id: 1}, {unique: true})
   index({e_case_id: 1}, { sparse: true })
@@ -93,20 +87,6 @@ class Family
          "households.hbx_enrollments.terminated_on" => 1
          },
          {name: "kind_and_state_and_created_and_terminated"})
-
-  index({"households.hbx_enrollments.is_any_enrollment_member_outstanding" => 1})
-  index({"households.hbx_enrollments.is_any_enrollment_member_outstanding" => 1,
-       "households.hbx_enrollments.aasm_state" => 1,
-       "households.hbx_enrollments.terminated_on" => 1
-       },
-       {name: "is_any_enrollment_member_outstanding_and_aasm_state_and_terminated_on"})
-
-  index({"households.hbx_enrollments.kind" => 1,
-       "households.hbx_enrollments.aasm_state" => 1,
-       "households.hbx_enrollments.is_any_enrollment_member_outstanding" => 1,
-       "households.hbx_enrollments.effective_on" => 1
-       },
-       {name: "kind_and_aasm_state_and_is_any_enrollment_member_outstanding_and_effective_on"})
 
   index({"households.hbx_enrollments._id" => 1})
   index({"households.hbx_enrollments.kind" => 1,
@@ -210,10 +190,8 @@ class Family
                                                       )
                                                     }
 
-  scope :all_with_hbx_enrollments,              -> { exists(:"households.hbx_enrollments" => true) }
   scope :by_datetime_range,                     ->(start_at, end_at){ where(:created_at.gte => start_at).and(:created_at.lte => end_at) }
   scope :all_enrollments,                       ->{  where(:"households.hbx_enrollments.aasm_state".in => HbxEnrollment::ENROLLED_STATUSES) }
-  scope :all_enrolled_and_enrolling_enrollments,->{  where(:"households.hbx_enrollments.aasm_state".in => (HbxEnrollment::ENROLLED_STATUSES + HbxEnrollment::RENEWAL_STATUSES))}
   scope :all_enrollments_by_writing_agent_id,   ->(broker_id){ where(:"households.hbx_enrollments.writing_agent_id" => broker_id) }
   scope :all_enrollments_by_benefit_group_id,   ->(benefit_group_id){where(:"households.hbx_enrollments.benefit_group_id" => benefit_group_id) }
   scope :all_enrollments_by_benefit_sponsorship_id,   ->(benefit_sponsorship_id){where(:"households.hbx_enrollments.benefit_sponsorship_id" => benefit_sponsorship_id) }
@@ -226,7 +204,11 @@ class Family
   scope :non_enrolled,                          ->{ where(:"households.hbx_enrollments.aasm_state".nin => HbxEnrollment::ENROLLED_STATUSES) }
   scope :sep_eligible,                          ->{ where(:"active_seps.count".gt => 0) }
   scope :coverage_waived,                       ->{ where(:"households.hbx_enrollments.aasm_state".in => HbxEnrollment::WAIVED_STATUSES) }
-  scope :having_unverified_enrollment,          ->{ by_enrollment_individual_market.all_enrollments.where(:"households.hbx_enrollments.is_any_enrollment_member_outstanding" => true)}
+  scope :having_unverified_enrollment,          ->{ where(:"households.hbx_enrollments.aasm_state" => "enrolled_contingent")}
+  scope :with_all_verifications,                ->{ where(:"households.hbx_enrollments" => {:"$elemMatch" => {:"aasm_state" => "enrolled_contingent", :"review_status" => "ready"}})}
+  scope :with_partial_verifications,            ->{ where(:"households.hbx_enrollments" => {:"$elemMatch" => {:"aasm_state" => "enrolled_contingent", :"review_status" => "in review"}})}
+  scope :with_no_verifications,                 ->{ where(:"households.hbx_enrollments" => {:"$elemMatch" => {:"aasm_state" => "enrolled_contingent", :"review_status" => "incomplete"}})}
+  scope :with_reset_verifications,              ->{ where(:"households.hbx_enrollments.aasm_state" => "enrolled_contingent")}
   scope :vlp_fully_uploaded,                    ->{ where(vlp_documents_status: "Fully Uploaded")}
   scope :vlp_partially_uploaded,                ->{ where(vlp_documents_status: "Partially Uploaded")}
   scope :vlp_none_uploaded,                     ->{ where(:vlp_documents_status.in => ["None",nil])}
@@ -284,7 +266,7 @@ class Family
   end
 
   def currently_enrolled_plans(enrollment)
-    enrolled_enrollments = active_household.hbx_enrollments.enrolled_and_renewing.by_coverage_kind(enrollment.coverage_kind)
+    enrolled_plans = active_household.hbx_enrollments.enrolled_and_renewing.by_coverage_kind(enrollment.coverage_kind)
 
     if enrollment.is_shop?
       bg_ids = enrollment.sponsored_benefit_package.benefit_application.benefit_packages.map(&:id)
@@ -307,10 +289,6 @@ class Family
   # @return [ FamilyMember ] the designated head of this family
   def primary_applicant
     family_members.detect { |family_member| family_member.is_primary_applicant? && family_member.is_active? }
-  end
-
-  def primary_person
-    primary_applicant.person if primary_applicant
   end
 
   def primary_family_member=(new_primary_family_member)
@@ -625,7 +603,7 @@ class Family
   end
 
   def relate_new_member(person, relationship)
-    primary_applicant_person.ensure_relationship_with(person, relationship, self.id) #old_code
+    primary_applicant_person.ensure_relationship_with(person, relationship)
     add_family_member(person)
   end
 
@@ -643,6 +621,7 @@ class Family
     is_consent_applicant  = opts[:is_consent_applicant]  || false
 
     existing_family_member = family_members.detect { |fm| fm.person_id.to_s == person.id.to_s }
+
     if existing_family_member
       active_household.add_household_coverage_member(existing_family_member)
       existing_family_member.is_active = true
@@ -667,7 +646,6 @@ class Family
     family_member = find_family_member_by_person(person)
     if family_member.present?
       family_member.is_active = false
-      person.remove_relationship(self.id) #delete family reltionships associated to deleted member
       active_household.remove_family_member(family_member)
     end
 
@@ -789,59 +767,6 @@ class Family
     enrollments.verification_needed.any?
   end
 
-  def application_applicable_year
-    current_year = TimeKeeper.date_of_record.year
-    enrollment_start_on_year = Settings.aca.individual_market.open_enrollment.start_on.to_date
-    current_hbx = HbxProfile.current_hbx
-    if current_hbx && current_hbx.under_open_enrollment? && current_year == enrollment_start_on_year.year
-      current_year + 1
-    else
-      current_year
-    end
-  end
-
-  def latest_applicable_submitted_application
-    return nil unless applications.present?
-    applications.where(:assistance_year => application_applicable_year, :aasm_state.in => ["submitted", "determined"]).order_by(:submitted_at => 'desc').first
-  end
-
-  def has_financial_assistance_verification?
-    return false if applications.blank?
-    latest_applicable_submitted_application.present? ? true : false
-  end
-
-  def application_in_progress
-    # Do we disable creating new Applications if there is one already in “draft”?
-    # Also implement the logic to populate assistance_year (current_year or next_year based on application done before/after OE)
-    #applications.where(aasm_state: "draft", assistance_year: TimeKeeper.date_of_record.year).last
-    applications.where(aasm_state: "draft").last
-  end
-
-  def active_approved_application
-    # Returns the most recent application that is approved (has eligibility determination) for the current year.
-    applications.where(aasm_state: "determined", assistance_year: application_applicable_year).order_by(:submitted_at => 'desc').first
-  end
-
-  def approved_applications_for_year(year)
-    # Returns the last application that is approved (has eligibility determination) for a given year.
-    applications.where(aasm_state: "determined", assistance_year: year)
-  end
-
-  def approved_applications
-    # Returns all approved applications
-    applications.where(aasm_state: "determined")
-  end
-
-  def latest_submitted_application
-    #Returns last application submitted, aasm state is not in draft
-    applications.order_by(:submitted_at => 'desc').first
-  end
-
-  def latest_drafted_application
-    #Returns last application submitted, aasm state is not in draft
-    applications.order_by(:created_at => 'desc').first
-  end
-
   class << self
     # Set the sort order to return families by primary applicant last_name, first_name
     def default_search_order
@@ -856,23 +781,15 @@ class Family
           :aasm_state.in => HbxEnrollment::ENROLLED_STATUSES - ['coverage_termination_pending', 'enrolled_contingent', 'unverified']
       }
       families = Family.where("households.hbx_enrollments" => {:$elemMatch => query})
-      @logger = Logger.new("#{Rails.root}/log/expire_individual_market_enrollments_#{TimeKeeper.date_of_record.strftime('%Y_%m_%d')}.log") if families.present?
-      @logger.info "Started expire_individual_market_enrollments process at #{TimeKeeper.datetime_of_record.to_s}" if @logger
-      families.no_timeout.each do |family|
+      families.each do |family|
         begin
-          @logger.info "--------------- Processing family_id: #{family.id} ---------------"
           family.active_household.hbx_enrollments.where(query).each do |enrollment|
-            if enrollment.may_expire_coverage?
-              enrollment.expire_coverage!
-              @logger.info "Processed enrollment: #{enrollment.hbx_id}"
-            end
+            enrollment.expire_coverage! if enrollment.may_expire_coverage?
           end
         rescue Exception => e
-          Rails.logger.error "Unable to expire enrollments for family #{family.id}, error: #{e.backtrace}"
-          @logger.info "Unable to expire enrollments for family #{family.id}, error: #{e.backtrace}"
+          Rails.logger.error "Unable to expire enrollments for family #{family.e_case_id}"
         end
       end
-      @logger.info "Ended begin_coverage_for_ivl_enrollments process at #{TimeKeeper.datetime_of_record.to_s}" if @logger
     end
 
     def begin_coverage_for_ivl_enrollments
@@ -883,23 +800,12 @@ class Family
           :aasm_state => 'auto_renewing'
         }
       families = Family.where("households.hbx_enrollments" => {:$elemMatch => query})
-      @logger = Logger.new("#{Rails.root}/log/begin_coverage_for_ivl_enrollments_#{TimeKeeper.date_of_record.strftime('%Y_%m_%d')}.log") if families.present?
-      @logger.info "Started begin_coverage_for_ivl_enrollments process at #{TimeKeeper.datetime_of_record.to_s}" if @logger
-      families.no_timeout.each do |family|
-        begin
-          @logger.info "--------------- Processing family_id: #{family.id} ---------------"
-          family.active_household.hbx_enrollments.where(query).each do |enrollment|
-            if enrollment.may_begin_coverage?
-              enrollment.begin_coverage!
-              @logger.info "Processed enrollment: #{enrollment.hbx_id}"
-            end
-          end
-        rescue Exception => e
-          Rails.logger.error "Unable to begin coverage(enrollments) for family #{family.id}, error: #{e.backtrace}"
-          @logger.info "Unable to begin coverage(enrollments) for family #{family.id}, error: #{e.backtrace}"
+
+      families.each do |family|
+        family.active_household.hbx_enrollments.where(query).each do |enrollment|
+          enrollment.begin_coverage! if enrollment.may_begin_coverage?
         end
       end
-      @logger.info "Ended begin_coverage_for_ivl_enrollments process at #{TimeKeeper.datetime_of_record.to_s}" if @logger
     end
 
     # Manage: SEPs, FamilyMemberAgeOff
@@ -983,19 +889,13 @@ class Family
     person = family_member.person
     return if person.consumer_role.present?
     person.build_consumer_role({:is_applicant => false}.merge(opts))
-    transition = IndividualMarketTransition.new
-    transition.role_type = "consumer"
-    transition.submitted_at = TimeKeeper.datetime_of_record
-    transition.reason_code = "generating_consumer_role"
-    transition.effective_starting_on = TimeKeeper.datetime_of_record
-    person.individual_market_transitions << transition
     person.save!
   end
 
   def check_for_consumer_role
-    if primary_applicant.person.is_consumer_role_active?
+    if primary_applicant.person.consumer_role.present?
       active_family_members.each do |family_member|
-        build_consumer_role(family_member) if family_member.person.is_consumer_role_active?
+        build_consumer_role(family_member)
       end
     end
   end
@@ -1004,19 +904,13 @@ class Family
     person = family_member.person
     return if person.resident_role.present?
     person.build_resident_role({:is_applicant => false}.merge(opts))
-    transition = IndividualMarketTransition.new
-    transition.role_type = "resident"
-    transition.submitted_at = TimeKeeper.datetime_of_record
-    transition.reason_code = "generating_resident_role"
-    transition.effective_starting_on = TimeKeeper.datetime_of_record
-    person.individual_market_transitions << transition
     person.save!
   end
 
   def check_for_resident_role
-    if primary_applicant.person.is_resident_role_active?
+    if primary_applicant.person.resident_role.present?
       active_family_members.each do |family_member|
-        build_resident_role(family_member) if family_member.person.is_resident_role_active?
+        build_resident_role(family_member)
       end
     end
   end
@@ -1104,145 +998,6 @@ class Family
     ::MapReduce::FamilySearchForFamily.populate_for(self)
   end
 
-  #Used for RelationshipMatrix
-  def build_relationship_matrix
-    family_id = self.id
-    family_members_id = family_members.where(is_active: true).map(&:person_id)
-    matrix_size = family_members.where(is_active: true).count
-    matrix = Array.new(matrix_size){Array.new(matrix_size)}
-    id_map = {}
-    family_members_id.each_with_index { |hmid, index| id_map.merge!(index => hmid ) }
-    matrix.each_with_index do |x, xi|
-      x.each_with_index do |y, yi|
-        matrix[xi][yi] = find_existing_relationship(id_map[xi], id_map[yi], family_id)
-        matrix[yi][xi] = find_existing_relationship(id_map[yi], id_map[xi], family_id)
-      end
-    end
-    matrix = apply_rules_and_update_relationships(matrix, family_id)
-    return matrix
-  end
-
-  def find_existing_relationship(member_a_id, member_b_id, family_id)
-    return "self" if member_a_id == member_b_id
-    person = Person.find(member_a_id)
-    rel = person.person_relationships.where(family_id: family_id, predecessor_id: member_a_id, successor_id: member_b_id).first
-    return rel.kind if rel.present?
-  end
-
-  def find_all_relationships(matrix)
-    id_map = {}
-    family_members_id = family_members.where(is_active: true).map(&:person_id)
-    family_members_id.each_with_index { |hmid, index| id_map.merge!(index => hmid ) }
-    all_relationships = []
-    matrix.each_with_index do |x, xi|
-      x.each_with_index do |y, yi|
-        if (xi < yi)
-          relation = Person.find(id_map[xi]).person_relationships.where(family_id: self.id, predecessor_id: id_map[xi], successor_id: id_map[yi]).first
-          relation_kind = relation.present? ? relation.kind : nil
-          all_relationships << {:predecessor => id_map[xi], :relation => relation_kind,  :successor => id_map[yi]}
-        end
-      end
-    end
-    all_relationships
-  end
-
-  def find_missing_relationships(matrix)
-    id_map = {}
-    family_members_id = family_members.where(is_active: true).map(&:person_id)
-    family_members_id.each_with_index { |hmid, index| id_map.merge!(index => hmid ) }
-    missing_relationships = []
-    matrix.each_with_index do |x, xi|
-      x.each_with_index do |y, yi|
-        if (xi > yi) && matrix[xi][yi].blank?
-          missing_relationships << {id_map[xi] => id_map[yi]}
-        end
-      end
-    end
-    missing_relationships
-  end
-
-  def apply_rules_and_update_relationships(matrix, family_id)
-    missing_relationship =  find_missing_relationships(matrix)
-
-    # Sibling rule
-    missing_relationship.each do |rel|
-      first_rel = rel.to_a.flatten.first
-      second_rel = rel.to_a.flatten.second
-      relation1 = Person.find(first_rel).person_relationships.where(family_id: family_id, predecessor_id: first_rel, kind: "child").to_a
-      relation2 = Person.find(second_rel).person_relationships.where(family_id: family_id, predecessor_id: second_rel, kind: "child").to_a
-
-      relation = relation1 + relation2
-      s_ids = relation.collect(&:successor_id)
-
-      if s_ids.count > s_ids.uniq.count
-        members = Person.where(:id.in => rel.to_a.flatten)
-        members.second.person_relationships.create(family_id: family_id, predecessor_id: members.second.id, successor_id: members.first.id, kind: "sibling")
-        members.first.person_relationships.create(family_id: family_id, predecessor_id: members.first.id, successor_id: members.second.id, kind: "sibling")
-        missing_relationship = missing_relationship - [rel] #Remove Updated Relation from list of missing relationships
-      end
-    end
-
-    #GrandParent/GrandChild
-    missing_relationship.each do |rel|
-      first_rel = rel.to_a.flatten.first
-      second_rel = rel.to_a.flatten.second
-
-      relation1 = Person.find(first_rel).person_relationships.where(family_id: family_id, predecessor_id: first_rel, :kind.in => ['parent', 'child']).to_a
-      relation2 = Person.find(second_rel).person_relationships.where(family_id: family_id, predecessor_id: second_rel, :kind.in => ['parent', 'child']).to_a
-
-      relation = relation1 + relation2
-      s_ids = relation.collect(&:successor_id)
-
-      s_ids.each do |p_id|
-        parent_rel1 = Person.find(first_rel).person_relationships.where(family_id: family_id, successor_id: p_id, predecessor_id: first_rel, kind: "parent").first
-        child_rel1 = Person.find(first_rel).person_relationships.where(family_id: family_id, successor_id: p_id, predecessor_id: first_rel, kind: "child").first
-        parent_rel2 = Person.find(second_rel).person_relationships.where(family_id: family_id, successor_id: p_id, predecessor_id: second_rel, kind: "parent").first
-        child_rel2 = Person.find(second_rel).person_relationships.where(family_id: family_id, successor_id: p_id, predecessor_id: second_rel, kind: "child").first
-
-        if parent_rel1.present? && child_rel2.present?
-          grandchild = Person.where(id: second_rel).first
-          grandparent = Person.where(id: first_rel).first
-          grandparent.person_relationships.create(family_id: family_id, predecessor_id: grandparent.id, successor_id: grandchild.id, kind: "grandparent")
-          grandchild.person_relationships.create(family_id: family_id, predecessor_id: grandchild.id, successor_id: grandparent.id, kind: "grandchild")
-          missing_relationship = missing_relationship - [rel] #Remove Updated Relation from list of missing relationships
-          break
-        elsif child_rel1.present? && parent_rel2.present?
-          grandchild = Person.where(id: first_rel).first
-          grandparent = Person.where(id: second_rel).first
-          grandparent.person_relationships.create(family_id: family_id, predecessor_id: grandparent.id, successor_id: grandchild.id, kind: "grandparent")
-          grandchild.person_relationships.create(family_id: family_id, predecessor_id: grandchild.id, successor_id: grandparent.id, kind: "grandchild")
-          missing_relationship = missing_relationship - [rel] #Remove Updated Relation from list of missing relationships
-          break
-        end
-      end
-    end
-
-    # Spouse Rule
-    missing_relationship.each do |rel|
-      first_rel = rel.to_a.flatten.first
-      second_rel = rel.to_a.flatten.second
-
-      parent_rel1 = Person.find(first_rel).person_relationships.where(family_id: family_id, predecessor_id: first_rel, kind: 'child').first
-      parent_rel2 = Person.find(second_rel).person_relationships.where(family_id: family_id, predecessor_id: second_rel, kind: 'child').first
-
-      if parent_rel1.present? && parent_rel2.present?
-        spouse_relation = Person.find(parent_rel1.successor_id).person_relationships.where(family_id: family_id, predecessor_id: parent_rel1.successor_id, successor_id: parent_rel2.successor_id, kind: "spouse").first
-        if spouse_relation.present?
-          members = Person.where(:id.in => rel.to_a.flatten)
-          members.second.person_relationships.create(family_id: family_id, predecessor_id: members.second.id, successor_id: members.first.id, kind: "sibling") 
-          members.first.person_relationships.create(family_id: family_id, predecessor_id: members.first.id, successor_id: members.second.id, kind: "sibling")
-          missing_relationship = missing_relationship - [rel] #Remove Updated Relation from list of missing relationships
-        end
-      end
-    end
-
-    return matrix
-  end
-
-  def relationships_complete?
-    find_missing_relationships(build_relationship_matrix).present? ? false : true
-  end
-
   def create_dep_consumer_role
     if dependents.any?
       dependents.each do |member|
@@ -1261,8 +1016,8 @@ class Family
   def contingent_enrolled_family_members_due_dates
     due_dates = []
     contingent_enrolled_active_family_members.each do |family_member|
-      family_member.person.verification_types.active.each do |v_type|
-        due_dates << v_type.verif_due_date if VerificationType::DUE_DATE_STATES.include? v_type.validation_status
+      family_member.person.verification_types.each do |v_type|
+        due_dates << document_due_date(family_member, v_type)
       end
     end
     due_dates.compact!
@@ -1275,8 +1030,7 @@ class Family
 
   def contingent_enrolled_active_family_members
     enrolled_family_members = []
-    family_members = active_family_members.collect { |member| member if member.person.is_consumer_role_active? }.compact
-    family_members.each do |family_member|
+    family_members.active.each do |family_member|
       if enrolled_policy(family_member).present?
         enrolled_family_members << family_member
       end
@@ -1284,8 +1038,10 @@ class Family
     enrolled_family_members
   end
 
-  def document_due_date(v_type)
-    (["verified", "attested", "valid"].include? v_type.validation_status) ? nil : v_type.due_date
+  def document_due_date(family_member, v_type)
+    return nil if family_member.person.consumer_role.is_type_verified?(v_type)
+    sv = family_member.person.consumer_role.special_verifications.where(verification_type: v_type).order_by(:"created_at".desc).first
+    sv.present? ? sv.due_date : nil
   end
 
   def enrolled_policy(family_member)
@@ -1304,10 +1060,6 @@ class Family
     active_household.hbx_enrollments.where(:aasm_state.in => HbxEnrollment::ENROLLED_STATUSES).flat_map(&:hbx_enrollment_members).flat_map(&:family_member).flat_map(&:person).include?(person)
   end
 
-  def has_curam_or_mobile_application_type?
-    ['Curam', 'Mobile'].include? application_type
-  end
-  
   def self.min_verification_due_date_range(start_date,end_date)
     timekeeper_date = TimeKeeper.date_of_record + 95.days
     if timekeeper_date >= start_date.to_date && timekeeper_date <= end_date.to_date
@@ -1318,56 +1070,41 @@ class Family
   end
 
   def all_persons_vlp_documents_status
-    outstanding_types = []
+    documents_list = []
+    document_status_outstanding = []
     self.active_family_members.each do |member|
-      outstanding_types = outstanding_types + member.person.verification_types.active.select{|type| ["outstanding", "pending", "review"].include? type.validation_status }
+      member.person.verification_types.each do |type|
+      if member.person.consumer_role && is_document_not_verified(type, member.person)
+        documents_list <<  (member.person.consumer_role.has_docs_for_type?(type) && verification_type_status(type, member.person) != "outstanding")
+        document_status_outstanding << member.person.consumer_role.has_outstanding_documents?
+      end
+      end
     end
-    fully_uploaded = outstanding_types.any? ? outstanding_types.all?{ |type| (type.type_documents.any? && !type.rejected) } : nil
-    partially_uploaded = outstanding_types.any? ? outstanding_types.any?{ |type| (type.type_documents.any? && !type.rejected)} : nil
-    if fully_uploaded
-      "Fully Uploaded"
-    elsif partially_uploaded
-      "Partially Uploaded"
-    else
-      "None"
+    case
+    when documents_list.include?(true) && documents_list.include?(false)
+      return "Partially Uploaded"
+    when documents_list.include?(true) && !documents_list.include?(false)
+      if document_status_outstanding.include?("outstanding")
+        return "Partially Uploaded"
+      else
+        return "Fully Uploaded"
+      end
+    when !documents_list.include?(true) && documents_list.include?(false)
+      return "None"
     end
-  end
-
-  def has_active_consumer_family_members
-    self.active_family_members.select { |member| member if member.person.consumer_role.present?}
-  end
-
-  def has_active_resident_family_members
-    self.active_family_members.select { |member| member if member.person.is_resident_role_active? }
   end
 
   def update_family_document_status!
     update_attributes(vlp_documents_status: self.all_persons_vlp_documents_status)
   end
 
+  def is_document_not_verified(type, person)
+    ["valid", "attested", "verified", "External Source"].include?(verification_type_status(type, person))?  false : true
+  end
+
   def has_valid_e_case_id?
     return false if !e_case_id
     e_case_id.split('#').last.scan(/\D/).empty?
-  end
-  def set_due_date_on_verification_types(date=nil)
-    family_members.each do |family_member|
-      begin
-        person = family_member.person
-        person.consumer_role.verification_types.each do |v_type|
-          next if !(v_type.type_unverified?)
-          v_type.update_attributes(due_date: date.present? ? date : (TimeKeeper.date_of_record + 95.days),
-                                   updated_by: nil,
-                                   due_date_type:  "notice" )
-          person.save!
-        end
-      rescue Exception => e
-        puts "Exception in family ID #{family.id}: #{e}" unless Rails.env.test?
-      end
-    end
-  end
-
-  def has_primary_active_employee?
-    primary_applicant.person.has_active_employee_role?
   end
 
 private
@@ -1413,16 +1150,13 @@ private
     self.errors.add(:family_members, "may not have more than one primary family member") if list.size > 1
   end
 
-  def all_family_member_relations_defined #new_code Checks only in context of primary person.
+  def all_family_member_relations_defined
     return unless primary_family_member.present? && primary_family_member.person.present?
-    primary_member = primary_family_member
-    other_family_members = family_members.where(is_active: true).select { |fm| (fm.id.to_s != primary_member.id.to_s) }
-    undefined_relations = other_family_members.any? { |fm| find_relationship_between(primary_member.person, fm.person).blank? }
+    primary_member_id = primary_family_member.id
+    primary_person = primary_family_member.person
+    other_family_members = family_members.select { |fm| (fm.id.to_s != primary_member_id.to_s) && fm.person.present? }
+    undefined_relations = other_family_members.any? { |fm| primary_person.find_relationship_with(fm.person).blank? }
     errors.add(:family_members, "relationships between primary_family_member and all family_members must be defined") if undefined_relations
-  end
-
-  def find_relationship_between(predecessor, successor)
-    predecessor.person_relationships.where(predecessor_id: predecessor.id, successor_id: successor.id, family_id: self.id).first
   end
 
   def single_active_household

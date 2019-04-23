@@ -140,7 +140,6 @@ RSpec.describe Insured::PlanShoppingsController, :type => :controller, dbclean: 
     let(:member_group) { double("MEMBERGROUP")}
 
     before do
-      allow(family).to receive(:application_in_progress).and_return(false)
       allow(user).to receive(:person).and_return(person)
       allow(HbxEnrollment).to receive(:find).with("id").and_return(hbx_enrollment)
       allow(BenefitMarkets::Products::Product).to receive(:find).with("plan_id").and_return(product)
@@ -170,44 +169,11 @@ RSpec.describe Insured::PlanShoppingsController, :type => :controller, dbclean: 
       expect(response).to have_http_status(:success)
     end
 
-     it "when enrollment has change plan" do
-      sign_in(user)
-      get :thankyou, id: "id", plan_id: "plan_id", change_plan: "rspec"
-      expect(assigns(:change_plan)).to eq "rspec"
-    end
-
-    it "when enrollment does not have change plan" do
-      sign_in(user)
-      allow(enrollment).to receive(:is_special_enrollment?).and_return true
-      get :thankyou, id: "id", plan_id: "plan_id"
-      expect(assigns(:change_plan)).to eq "change_plan"
-    end
-
     it "should be enrollable" do
       sign_in(user)
       get :thankyou, id: "id", plan_id: "plan_id"
       expect(assigns(:enrollable)).to be_truthy
     end
-
-    it "When enrollment kind receives" do
-      sign_in(user)
-      get :thankyou, id: "id", plan_id: "plan_id", enrollment_kind: "shop"
-      expect(assigns(:enrollment_kind)).to eq "shop"
-    end
-
-    it "when is_special_enrollment " do
-      sign_in(user)
-      allow(enrollment).to receive(:is_special_enrollment?).and_return true
-      get :thankyou, id: "id", plan_id: "plan_id"
-      expect(assigns(:enrollment_kind)).to eq "sep"
-    end
-
-    it "when no special_enrollment" do
-      sign_in(user)
-      get :thankyou, id: "id", plan_id: "plan_id"
-      expect(assigns(:enrollment_kind)).to eq ""
-    end
-
 
     it "should be waivable" do
       sign_in(user)
@@ -226,8 +192,6 @@ RSpec.describe Insured::PlanShoppingsController, :type => :controller, dbclean: 
 
     it "returns http success as BROKER" do
       person = create(:person)
-      transition = FactoryGirl.build(:individual_market_transition, :resident)
-      person.individual_market_transitions << transition
       f=FactoryGirl.create(:family,:family_members=>[{:is_primary_applicant=>true, :is_active=>true, :person_id => person.id}])
       current_broker_user = FactoryGirl.create(:user, :roles => ['broker_agency_staff'],
                                                :person => person )
@@ -374,7 +338,6 @@ RSpec.describe Insured::PlanShoppingsController, :type => :controller, dbclean: 
       allow(HbxEnrollment).to receive(:find).with("hbx_id").and_return(hbx_enrollment)
       allow(hbx_enrollment).to receive(:household).and_return(household)
       allow(family).to receive(:family_members).and_return(family_members)
-      allow(controller).to receive(:get_tax_households_from_family_members).and_return []
       allow(user).to receive(:person).and_return(person)
       allow(person).to receive(:primary_family).and_return(family)
       allow(family).to receive(:enrolled_hbx_enrollments).and_return([])

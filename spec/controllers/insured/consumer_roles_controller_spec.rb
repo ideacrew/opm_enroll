@@ -59,8 +59,7 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       allow(user).to receive(:save!).and_return(true)
       allow(user).to receive(:person).and_return(person)
       allow(person).to receive(:consumer_role).and_return(consumer_role)
-      allow(person).to receive(:is_consumer_role_active?).and_return(false)
-      allow(person).to receive(:is_resident_role_active?).and_return(false)
+      allow(person).to receive(:has_active_consumer_role?).and_return(false)
       allow(consumer_role).to receive(:save!).and_return(true)
     end
 
@@ -180,16 +179,11 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
 
   context "POST create", dbclean: :after_each do
     let(:person_params){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"000000111","user_id"=>"xyz"}}
-    let(:person_user){ double("User") }
     before(:each) do
       allow(Factories::EnrollmentFactory).to receive(:construct_employee_role).and_return(consumer_role)
       allow(consumer_role).to receive(:person).and_return(person)
       allow(person).to receive(:primary_family).and_return(family)
       allow(family).to receive(:create_dep_consumer_role)
-      allow(person).to receive(:is_consumer_role_active?).and_return(true)
-      allow(User).to receive(:find).and_return(person_user)
-      allow(person_user).to receive(:person).and_return(person)
-
     end
     it "should create new person/consumer role object" do
       sign_in user
@@ -203,12 +197,8 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
 
   context "POST create with failed construct_employee_role", dbclean: :after_each do
     let(:person_params){{"dob"=>"1985-10-01", "first_name"=>"martin","gender"=>"male","last_name"=>"york","middle_name"=>"","name_sfx"=>"","ssn"=>"000000111","user_id"=>"xyz"}}
-    let(:person_user){ double("User") }
     before(:each) do
       allow(Factories::EnrollmentFactory).to receive(:construct_consumer_role).and_return(nil)
-      allow(User).to receive(:find).and_return(person_user)
-      allow(Person).to receive(:find).and_return(person)
-      allow(person_user).to receive(:person).and_return(person)
     end
     it "should throw a 500 error" do
       sign_in user
@@ -281,12 +271,12 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       expect(response).to redirect_to(ridp_agreement_insured_consumer_role_index_path)
     end
 
-    it "should redirect to help paying for coverage path when current user is admin & doing new paper app" do
+    it "should redirect to family members path when current user is admin & doing new paper app" do
       allow(controller).to receive(:update_vlp_documents).and_return(true)
       allow(controller).to receive(:is_new_paper_application?).and_return true
       put :update, person: person_params, id: "test"
       expect(response).to have_http_status(:redirect)
-      expect(response).to redirect_to help_paying_coverage_financial_assistance_applications_path
+      expect(response).to redirect_to(insured_family_members_path(consumer_role_id: consumer_role.id))
     end
 
     it "should not update the person" do
@@ -375,13 +365,10 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       end
 
       before :each do
-        allow(user).to receive(:person).and_return(person100)
-        allow(person100).to receive(:consumer_role?).and_return(true)
-        allow(person100).to receive(:consumer_role).and_return(consumer_role)
-        allow(person100).to receive(:completed_identity_verification?).and_return(true)
-        allow(person100.consumer_role).to receive(:identity_verified?).and_return(true)
-        allow(person100.consumer_role).to receive(:application_verified?).and_return(true)
-        allow(person100.primary_family).to receive(:has_curam_or_mobile_application_type?).and_return(true)
+        allow(user).to receive(:person).and_return(person)
+        allow(person).to receive(:consumer_role?).and_return(true)
+        allow(person).to receive(:consumer_role).and_return(consumer_role)
+        allow(person).to receive(:completed_identity_verification?).and_return(true)
         get "ridp_agreement"
       end
 
@@ -396,12 +383,8 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       end
 
       before :each do
-        allow(user).to receive(:person).and_return(person100)
-        allow(person100).to receive(:completed_identity_verification?).and_return(false)
-        allow(person100).to receive(:consumer_role).and_return(consumer_role)
-        allow(person100.consumer_role).to receive(:identity_verified?).and_return(false)
-        allow(person100.consumer_role).to receive(:application_verified?).and_return(false)
-        allow(person100.primary_family).to receive(:has_curam_or_mobile_application_type?).and_return(false)
+        allow(user).to receive(:person).and_return(person)
+        allow(person).to receive(:completed_identity_verification?).and_return(false)
         get "ridp_agreement"
       end
 
@@ -431,10 +414,6 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       allow(mock_employee_candidate).to receive(:valid?).and_return(false)
       allow(mock_resident_candidate).to receive(:valid?).and_return(true)
       allow(user).to receive(:person).and_return(person)
-      allow(person).to receive(:is_consumer_role_active?).and_return(false)
-      allow(person).to receive(:is_resident_role_active?).and_return(false)
-
-
     end
 
     context "with pre-existing consumer_role", dbclean: :after_each do
@@ -449,8 +428,6 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
     context "with pre-existing resident_role", dbclean: :after_each do
       it "should navigate to family account page" do
         allow(person).to receive(:resident_role).and_return(resident_role)
-        allow(person).to receive(:is_resident_role_active?).and_return(true)
-
         post :match, :person => resident_parameters
         expect(user.person.resident_role).not_to be_nil
         expect(response).to redirect_to(family_account_path)
@@ -461,9 +438,6 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
       it "should navigate to family account page" do
         allow(person).to receive(:consumer_role).and_return(consumer_role)
         allow(person).to receive(:resident_role).and_return(resident_role)
-        allow(person).to receive(:is_resident_role_active?).and_return(true)
-        allow(person).to receive(:is_consumer_role_active?).and_return(true)
-
         post :match, :person => resident_parameters
         expect(user.person.consumer_role).not_to be_nil
         expect(user.person.resident_role).not_to be_nil
@@ -496,6 +470,7 @@ RSpec.describe Insured::ConsumerRolesController, dbclean: :after_each, :type => 
         expect(response).to redirect_to(edit_insured_consumer_role_path(user.person.consumer_role.id))
       end
     end
+
   end
 end
 end

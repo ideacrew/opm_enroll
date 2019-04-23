@@ -1,13 +1,6 @@
 <%= render partial: 'notices/shared/cover_page', :locals => {notice: notice} %>
-<%= render partial: 'notices/shared/logo_and_address_shop', :locals => {notice: notice} %>
+<%= render partial: 'notices/shared/logo_and_address_shop' %>
 <%= render partial: "notices/shared/shop_address", :locals => {notice: notice} %>
-<table class="total_table" border="0">
-  <tbody>
-    <tr>
-      <td><strong>Email notification sent to:</strong> <%= notice.employer_email %></td>
-    </tr>
-  </tbody>
-</table>
 <%= render partial: "notices/shared/date", :locals => {notice: notice} %>
 
 <table class="total_table" border="0">
@@ -113,7 +106,7 @@
         <td>
           <ul style="list-style: circle solid;">
           <li>
-            <strong>Dental Coverage through OPM</strong><br>Employers who have chosen to offer dental coverage to their employees should be aware that: (1) you will receive one bill for both medical and dental benefits, and (2) there is no minimum participation requirement for dental coverage.
+            <strong>Dental Coverage through DC Health Link</strong><br>Employers who have chosen to offer dental coverage to their employees should be aware that: (1) you will receive one bill for both medical and dental benefits, and (2) there is no minimum participation requirement for dental coverage.
           </li>
           </ul>
         </td>
@@ -129,7 +122,7 @@
  previous: "Please contact your broker for further assistance.  You can also contact #{Settings.site.short_name} with any questions:",
  listings: ["By calling #{notice.hbe.phone}.",
             "TTY: 711",
-            "Online at https://www.bewellnm.com/"] } %>
+            "Online at www.DCHealthLink.com"] } %>
 
 <% if notice.broker.present? %>
   <%= render partial: 'notices/shared/broker_contact_info', :locals => {broker: notice.broker} %>

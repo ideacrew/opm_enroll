@@ -8,7 +8,7 @@ class MoveDueDateToVerificationTypeLevel < MongoidMigrationTask
       :"households.hbx_enrollments" => {
         :"$elemMatch" => {
           :"special_verification_period".ne => nil,
-          :"is_any_enrollment_member_outstanding" => true
+          :"aasm_state" => "enrolled_contingent"
         }
     }).each do |family|
       family.family_members.each do |f_member|
@@ -26,7 +26,9 @@ class MoveDueDateToVerificationTypeLevel < MongoidMigrationTask
               next
             elsif due_date.present?
               # this is the notice sent out date.
-              v_type.update_attributes(due_date: due_date, type: "notice")
+              role.special_verifications << SpecialVerification.new(due_date: due_date,
+              verification_type: v_type,
+              type: "notice")
               if role.save!
                 puts "special verification created for #{person.full_name} On family of #{family.primary_applicant.person.full_name}" unless Rails.env.test?
               end

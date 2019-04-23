@@ -258,7 +258,7 @@ RSpec.describe Insured::GroupSelectionController, :type => :controller, dbclean:
       before :each do
         allow(HbxProfile).to receive(:current_hbx).and_return hbx_profile
         allow(benefit_coverage_period).to receive(:benefit_packages).and_return [benefit_package]
-        allow(person).to receive(:is_consumer_role_active?).and_return true
+        allow(person).to receive(:has_active_consumer_role?).and_return true
         allow(person).to receive(:has_active_employee_role?).and_return false
         allow(HbxEnrollment).to receive(:find).and_return nil
         allow(HbxEnrollment).to receive(:calculate_effective_on_from).and_return TimeKeeper.date_of_record
@@ -275,15 +275,6 @@ RSpec.describe Insured::GroupSelectionController, :type => :controller, dbclean:
         get :new, person_id: person.id, consumer_role_id: consumer_role.id, change_plan: "change", hbx_enrollment_id: "123"
         expect(assigns(:new_effective_on)).to eq TimeKeeper.date_of_record
       end
-    end
-
-    context 'when send request in js' do
-      before do
-        sign_in user
-        get :new, person_id: person.id, employee_role_id: employee_role.id, format: :js
-      end
-      it { expect(response).to have_http_status(:success) }
-      it { expect(response).to render_template('new') }
     end
   end
 
@@ -320,7 +311,7 @@ RSpec.describe Insured::GroupSelectionController, :type => :controller, dbclean:
       expect(HbxEnrollment.aasm.state_machine.events[:terminate_coverage].transitions[0].opts.values.include?(:propogate_terminate)).to eq true
       expect(hbx_enrollment.termination_submitted_on).to eq nil
       post :terminate, term_date: TimeKeeper.date_of_record, hbx_enrollment_id: hbx_enrollment.id
-      expect(hbx_enrollment.termination_submitted_on.to_time).to be_within(5.seconds).of(TimeKeeper.datetime_of_record)
+      expect(hbx_enrollment.termination_submitted_on).to eq TimeKeeper.datetime_of_record
       expect(response).to redirect_to(family_account_path)
     end
 

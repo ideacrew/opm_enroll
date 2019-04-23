@@ -209,16 +209,4 @@ class Insured::GroupSelectionController < ApplicationController
       @role = c_role
     end
   end
-
-  def get_values_to_generate_resident_role(person)
-    options = {}
-    options[:is_applicant] = person.consumer_role.is_applicant
-    options[:bookmark_url] = person.consumer_role.bookmark_url
-    options[:is_state_resident] = person.consumer_role.is_state_resident
-    options[:residency_determined_at] = person.consumer_role.residency_determined_at
-    options[:contact_method] = person.consumer_role.contact_method
-    options[:language_preference] = person.consumer_role.language_preference
-    options
-  end
-
 end

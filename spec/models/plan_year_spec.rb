@@ -10,7 +10,7 @@ describe PlanYear, :type => :model, :dbclean => :after_each do
   let!(:employer_profile)               { FactoryGirl.create(:employer_profile) }
   let!(:rating_area)                    { RatingArea.first || FactoryGirl.create(:rating_area)  }
   let(:valid_plan_year_start_on)        { TimeKeeper.date_of_record.end_of_month + 1.day + 1.month }
-  let(:valid_plan_year_end_on)          { (valid_plan_year_start_on + 1.year - 1.day).end_of_month }
+  let(:valid_plan_year_end_on)          { valid_plan_year_start_on + 1.year - 1.day }
   let(:valid_open_enrollment_start_on)  { valid_plan_year_start_on.prev_month }
   let(:valid_open_enrollment_end_on)    { valid_open_enrollment_start_on + 9.days }
   let(:valid_fte_count)                 { 5 }
@@ -489,7 +489,7 @@ describe PlanYear, :type => :model, :dbclean => :after_each do
   context 'should return correct benefit group assignments for an employee' do
     let!(:employer_profile) { FactoryGirl.create(:employer_profile) }
     let(:plan_year_start_on) { TimeKeeper.date_of_record.end_of_month + 1.day }
-    let(:plan_year_end_on) { (TimeKeeper.date_of_record + 1.year).end_of_month }
+    let(:plan_year_end_on) { TimeKeeper.date_of_record.end_of_month + 1.year }
     let(:open_enrollment_start_on) { TimeKeeper.date_of_record.beginning_of_month }
     let(:open_enrollment_end_on) { open_enrollment_start_on + 12.days }
     let(:effective_date)         { plan_year_start_on }
@@ -1853,7 +1853,7 @@ describe PlanYear, :type => :model, :dbclean => :after_each do
     let!(:shop_family)       { FactoryGirl.create(:family, :with_primary_family_member, :person => person) }
 
     let(:plan_year_start_on) { TimeKeeper.date_of_record.end_of_month + 1.day }
-    let(:plan_year_end_on)   { (TimeKeeper.date_of_record + 1.year).end_of_month }
+    let(:plan_year_end_on) { TimeKeeper.date_of_record.end_of_month + 1.year }
     let(:open_enrollment_start_on) { TimeKeeper.date_of_record.beginning_of_month }
     let(:open_enrollment_end_on) { open_enrollment_start_on + 12.days }
     let(:effective_date)         { plan_year_start_on }
@@ -2095,17 +2095,6 @@ describe PlanYear, :type => :model, :dbclean => :after_each do
         expect(plan_year.aasm_state).to eq('renewing_enrolling')
       end
 
-      it 'should fire an event' do
-        expect(plan_year).to receive(:notify).with("acapi.info.events.plan_year.employee_renewal_invitations_requested", {:plan_year_id=> plan_year.id.to_s})
-        plan_year.send(:send_employee_invites)
-      end
-
-      it 'should send invitations to renewal census employees' do
-        expect(Invitation).to receive(:invite_renewal_employee!).with(census_employee)
-        plan_year.send_employee_renewal_invites
-      end
-
-
       it 'should send invitations to benefit group census employees'
       # Find a way to test this that relies on the event being fired, as well as write companion specs
       # to determine if the content is correct.  Right now this doesn't really check much
@@ -2123,16 +2112,6 @@ describe PlanYear, :type => :model, :dbclean => :after_each do
         it 'the plan should be in enrolling' do
           expect(plan_year.enrolling?).to be_truthy
           expect(plan_year.aasm_state).to eq('enrolling')
-        end
-
-        it 'should fire an event' do
-          expect(plan_year).to receive(:notify).with("acapi.info.events.plan_year.employee_initial_enrollment_invitations_requested", {:plan_year_id=> plan_year.id.to_s})
-          plan_year.send(:send_employee_invites)
-        end
-
-        it 'should send invitations to initial census employees' do
-          expect(Invitation).to receive(:invite_initial_employee!).with(census_employee)
-          plan_year.send_employee_initial_enrollment_invites
         end
 
         it 'should send invitations to benefit group census employees'

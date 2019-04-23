@@ -50,5 +50,7 @@ describe RemoveMemberFromHbxEnrollment, dbclean: :after_each do
         expect(household.hbx_enrollments.first.hbx_enrollment_members.size).to eq size-1
       end
     end
+
+
   end
 end

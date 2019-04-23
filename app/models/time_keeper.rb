@@ -11,22 +11,6 @@ class TimeKeeper
 
   def initialize
   end
-  
-  def self.local_time(a_time)
-    a_time.in_time_zone("Eastern Time (US & Canada)")
-  end
-
-  def self.local_time(a_time)
-    a_time.in_time_zone("Eastern Time (US & Canada)")
-  end
-
-  def self.format_date(a_time)
-    local_time(a_time).strftime('%m/%d/%Y')
-  end
-
-  def self.format_date_time(a_time)
-    local_time(a_time).strftime('%m/%d/%Y %I:%M%p')
-  end
 
   def self.local_time(a_time)
     a_time.in_time_zone("Eastern Time (US & Canada)")
@@ -112,6 +96,7 @@ class TimeKeeper
     Family.advance_day(self.date_of_record) if individual_market_is_enabled?
     HbxEnrollment.advance_day(self.date_of_record)
     CensusEmployee.advance_day(self.date_of_record)
+    ConsumerRole.advance_day(self.date_of_record)
   end
 
   def push_date_change_event

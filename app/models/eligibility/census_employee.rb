@@ -9,10 +9,10 @@ module Eligibility
         if newly_designated_eligible? || newly_designated_linked?
           effective_on_date = [effective_on_date, newly_eligible_earlist_eligible_date].max
         end
+
         effective_on_date
       end
     end
-
 
     def new_hire_enrollment_period
       start_on = [hired_on, TimeKeeper.date_according_to_exchange_at(created_at)].max

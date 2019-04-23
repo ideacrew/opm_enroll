@@ -180,42 +180,23 @@ describe FamilyMember, dbclean: :after_each do
   end
 end
 
-# describe FamilyMember, "which is inactive" do
-#   it "can be reactivated with a specified relationship"
-# end
-
-describe "for families with financial assistance application" do
-  let(:person) { FactoryGirl.create(:person)}
-  let(:person1) { FactoryGirl.create(:person)}
-  let(:family) { FactoryGirl.create(:family, :with_primary_family_member,person: person) }
-
-  before(:each) do
-    allow_any_instance_of(FinancialAssistance::Application).to receive(:set_benchmark_plan_id)
-  end
-
-  context "family_member added when application is in progress" do
-    it "should create an applicant with the family_member_id of the added member" do
-      family.applications.create!
-      expect(family.application_in_progress.active_applicants.count).to eq 0
-      fm = family.family_members.create!({person_id: person1.id, is_primary_applicant: false, is_coverage_applicant: true})
-      expect(family.application_in_progress.active_applicants.count).to eq 1
-      expect(family.application_in_progress.active_applicants.first.family_member_id).to eq fm.id
-    end
-  end
+describe FamilyMember, "which is inactive" do
+  it "can be reactivated with a specified relationship"
 end
 
-describe FamilyMember, "aptc_benchmark_amount" do
-  let(:person) { FactoryGirl.create(:person, :with_consumer_role, dob: TimeKeeper.date_of_record - 46.years)}
-  let(:family) {FactoryGirl.create(:family, :with_primary_family_member, person: person, e_case_id: "family_test#1000")}
-  let!(:hbx_profile) { FactoryGirl.create(:hbx_profile, :open_enrollment_coverage_period) }
-  let(:plan) { FactoryGirl.create(:plan, :with_premium_tables, market: 'individual', metal_level: 'gold', csr_variant_id: '01', active_year: TimeKeeper.date_of_record.year, hios_id: "11111111122302-01") }
+describe FamilyMember, "given a relationship to update" do
+  let(:family) { FactoryGirl.create(:family, :with_primary_family_member)}
+  let(:relationship) { "spouse" }
+  let(:person) { FactoryGirl.build(:person) }
+  subject { FactoryGirl.build(:family_member, person: person, family: family) }
 
-  before do
-    hbx_profile.benefit_sponsorship.benefit_coverage_periods.detect {|bcp| bcp.contains?(TimeKeeper.datetime_of_record)}.update_attributes!(slcsp_id: plan.id)
+  it "should do nothing if the relationship is the same" do
+    subject.update_relationship(subject.primary_relationship)
   end
-  
-  it "should return valid benchmark value" do
-    family_member = FamilyMember.new(:person => person) 
-    expect(family_member.aptc_benchmark_amount.round(2)).to eq 508.70
+
+  it "should update the relationship if different" do
+    expect(subject.primary_relationship).not_to eq relationship
+    subject.update_relationship(relationship)
+    expect(subject.primary_relationship).to eq relationship
   end
 end

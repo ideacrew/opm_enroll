@@ -17,8 +17,6 @@ Feature: Insured Plan Shopping on Individual market
     Then Individual sees previously saved address
     Then Individual agrees to the privacy agreeement
     Then Individual should see identity verification page and clicks on submit
-    Then Individual should be on the Help Paying for Coverage page
-    Then Individual does not apply for assistance and clicks continue
     Then Individual should see the dependents form
     And Individual clicks on add member button
     And Individual again clicks on add member button
@@ -51,8 +49,6 @@ Feature: Insured Plan Shopping on Individual market
     Then Individual sees previously saved address
     Then Individual agrees to the privacy agreeement
     Then Individual should see identity verification page and clicks on submit
-    Then Individual should be on the Help Paying for Coverage page
-    Then Individual does not apply for assistance and clicks continue
     Then Individual should see the dependents form
     And I click on continue button on household info form
     When I click on none of the situations listed above apply checkbox
@@ -81,8 +77,6 @@ Feature: Insured Plan Shopping on Individual market
     Then Individual sees previously saved address
     Then Individual agrees to the privacy agreeement
     Then Individual should see identity verification page and clicks on submit
-    Then Individual should be on the Help Paying for Coverage page
-    Then Individual does not apply for assistance and clicks continue
     Then Individual should see the dependents form
     And I click on continue button on household info form
     When I click the "Married" in qle carousel
@@ -113,7 +107,6 @@ Feature: Insured Plan Shopping on Individual market
     Then Individual sees previously saved address
     Then Individual agrees to the privacy agreeement
     Then Individual should see identity verification page and clicks on submit
-    Then Individual does not apply for assistance and clicks continue
     Then Individual should see the dependents form
     And Individual clicks on add member button
     And Individual again clicks on add member button #TODO re-write this step

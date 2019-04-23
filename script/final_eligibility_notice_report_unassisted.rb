@@ -1,9 +1,8 @@
-puts "-------------------------------------- Start of rake: #{TimeKeeper.datetime_of_record} --------------------------------------" unless Rails.env.test?
 batch_size = 500
 offset = 0
 family_count = Family.count
 
-plan_ids = Plan.where(:active_year => 2019, :market => "individual").map(&:_id)
+plan_ids = Plan.where(:active_year => 2018, :market => "individual").map(&:_id)
 
 csv = CSV.open("final_eligibility_notice_#{TimeKeeper.date_of_record.strftime('%m_%d_%Y')}.csv", "w")
 csv << %w(ic_number policy.id policy.subscriber.coverage_start_on policy.aasm_state policy.plan.coverage_kind policy.plan.metal_level policy.plan.plan_name policy.total_premium deductible family_deductible  subscriber_id member_id person.first_name person.last_name
@@ -34,7 +33,7 @@ def is_dc_resident(person)
 end
 
 def document_due_date(family)
-  enrolled_contingent_enrollment = family.enrollments.outstanding_enrollments.first
+  enrolled_contingent_enrollment = family.enrollments.where(:aasm_state => "enrolled_contingent", :kind => 'individual').first
   if enrolled_contingent_enrollment.present?
     if enrolled_contingent_enrollment.special_verification_period.present?
       enrolled_contingent_enrollment.special_verification_period.strftime("%m/%d/%Y")
@@ -47,18 +46,14 @@ def document_due_date(family)
 end
 
 def is_family_renewing(family)
-  family.active_household.hbx_enrollments.where(
-    :aasm_state.in => ["coverage_selected", "unverified", "coverage_terminated"],
-    kind: "individual",
-    :effective_on => {:"$gte" => Date.new(2018,1,1), :"$lte" =>  Date.new(2018,12,31)}
-  ).present?
+  family.active_household.hbx_enrollments.where(:aasm_state.in => ["coverage_selected", "enrolled_contingent"], kind: "individual", effective_on: Date.new(2017,1,1)).present?
 end
 
 def check_for_outstanding_verification_types(person)
   outstanding_verification_types = []
 
   if person.consumer_role.outstanding_verification_types.present?
-    outstanding_verification_types << person.consumer_role.outstanding_verification_types.map(&:type_name)
+    outstanding_verification_types << person.consumer_role.outstanding_verification_types
   else
     return nil
   end
@@ -77,8 +72,8 @@ while offset <= family_count
       next if !is_family_renewing(policy.family)
       next if policy.plan.nil?
       next if !plan_ids.include?(policy.plan_id)
-      next if policy.effective_on < Date.new(2019, 01, 01)
-      next if !(["auto_renewing", "coverage_selected", "unverified", "renewing_coverage_selected"].include?(policy.aasm_state))
+      next if policy.effective_on < Date.new(2018, 01, 01)
+      next if !(["auto_renewing", "coverage_selected", "enrolled_contingent"].include?(policy.aasm_state))
       next if !(['01', '03', ''].include?(policy.plan.csr_variant_id))#includes dental plans - csr_variant_id - ''
       next if policy.plan.market != 'individual'
       next if (!(['unassisted_qhp', 'individual'].include? policy.kind)) || has_current_aptc_hbx_enrollment(policy.family)
@@ -97,4 +92,3 @@ while offset <= family_count
 
   offset = offset + batch_size
 end
-puts "-------------------------------------- End of rake: #{TimeKeeper.datetime_of_record} --------------------------------------" unless Rails.env.test?

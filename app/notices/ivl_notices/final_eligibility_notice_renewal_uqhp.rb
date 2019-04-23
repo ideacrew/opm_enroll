@@ -3,11 +3,11 @@ class IvlNotices::FinalEligibilityNoticeRenewalUqhp < IvlNotice
   attr_accessor :family, :data, :person
 
   def initialize(consumer_role, args = {})
-    args[:recipient] = consumer_role.person
+    args[:recipient] = consumer_role.person.families.first.primary_applicant.person
     args[:notice] = PdfTemplates::ConditionalEligibilityNotice.new
     args[:market_kind] = 'individual'
-    args[:recipient_document_store]= consumer_role.person
-    args[:to] = consumer_role.person.work_email_or_best
+    args[:recipient_document_store]= consumer_role.person.families.first.primary_applicant.person
+    args[:to] = consumer_role.person.families.first.primary_applicant.person.work_email_or_best
     self.person = args[:person]
     self.data = args[:data]
     self.header = "notices/shared/header_ivl.html.erb"
@@ -48,7 +48,7 @@ class IvlNotices::FinalEligibilityNoticeRenewalUqhp < IvlNotice
   def pick_enrollments
     hbx_enrollments = []
     family = recipient.primary_family
-    enrollments = family.enrollments.where(:aasm_state.in => ["auto_renewing", "coverage_selected", "unverified", "renewing_coverage_selected"], :kind => "individual")
+    enrollments = family.enrollments.where(:aasm_state.in => ["auto_renewing", "coverage_selected", "enrolled_contingent"], :kind => "individual")
     return nil if enrollments.blank?
     health_enrollments = enrollments.detect{ |e| e.coverage_kind == "health" && e.effective_on.year.to_s == notice.coverage_year}
     dental_enrollments = enrollments.detect{ |e| e.coverage_kind == "dental" && e.effective_on.year.to_s == notice.coverage_year}
@@ -146,28 +146,24 @@ class IvlNotices::FinalEligibilityNoticeRenewalUqhp < IvlNotice
   #   end
   # end
 
-  def outstanding_verification_types(person)
-    person.consumer_role.outstanding_verification_types.map(&:type_name)
-  end
-
   def ssn_outstanding?(person)
-    outstanding_verification_types(person).include?("Social Security Number")
+    person.consumer_role.outstanding_verification_types.include?("Social Security Number")
   end
 
   def lawful_presence_outstanding?(person)
-    outstanding_verification_types(person).include?('Citizenship')
+    person.consumer_role.outstanding_verification_types.include?('Citizenship')
   end
 
   def immigration_status_outstanding?(person)
-   outstanding_verification_types(person).include?('Immigration status')
+   person.consumer_role.outstanding_verification_types.include?('Immigration status')
   end
 
   def american_indian_status_outstanding?(person)
-    outstanding_verification_types(person).include?('American Indian Status')
+    person.consumer_role.outstanding_verification_types.include?('American Indian Status')
   end
 
   def residency_outstanding?(person)
-    outstanding_verification_types(person).include?('DC Residency')
+    person.consumer_role.outstanding_verification_types.include?('DC Residency')
   end
 
   def append_unverified_individuals(people)
@@ -226,8 +222,8 @@ class IvlNotices::FinalEligibilityNoticeRenewalUqhp < IvlNotice
   end
 
   def is_dc_resident(person)
-    return false if person.no_dc_address == true && (person.is_homeless? || person.is_temporarily_out_of_state?)
-    return true if person.no_dc_address == true && (person.is_homeless? || person.is_temporarily_out_of_state?)
+    return false if person.no_dc_address == true && person.no_dc_address_reason.blank?
+    return true if person.no_dc_address == true && person.no_dc_address_reason.present?
 
     address_to_use = person.addresses.collect(&:kind).include?('home') ? 'home' : 'mailing'
     if person.addresses.present?

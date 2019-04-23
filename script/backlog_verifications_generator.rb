@@ -13,10 +13,10 @@ def create_directory(path)
   Dir.mkdir path
 end
 
-families = Family.all_enrollments.where({
+families = Family.where({
   "households.hbx_enrollments" => {
     "$elemMatch" => {
-      "is_any_enrollment_member_outstanding" => true,
+      "aasm_state" => { "$in" => ["enrolled_contingent"] },
       "effective_on" => { "$gte" => Date.new(2017,1,1)},
   } }
 }).to_a

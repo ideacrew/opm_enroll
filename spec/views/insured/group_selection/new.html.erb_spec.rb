@@ -73,9 +73,6 @@ RSpec.describe "insured/group_selection/new.html.erb" do
       allow(family_member4).to receive(:is_primary_applicant?).and_return(false)
       allow(person).to receive(:has_employer_benefits?).and_return(true)
       allow(person).to receive(:active_employee_roles).and_return [employee_role]
-      allow(person).to receive(:current_individual_market_transition).and_return(individual_market_transition)
-      allow(individual_market_transition).to receive(:role_type).and_return(nil)
-      allow(person).to receive(:is_consumer_role_active?).and_return(false)
       #@eligibility = InsuredEligibleForBenefitRule.new(employee_role,'shop')
       #allow(@eligibility).to receive(:satisfied?).and_return([true, true, false])
       controller.request.path_parameters[:person_id] = person.id
@@ -391,7 +388,6 @@ RSpec.describe "insured/group_selection/new.html.erb" do
     include_context "setup benefit market with market catalogs and product packages"
     include_context "setup initial benefit application"
     let(:person) { FactoryGirl.create(:person, :with_employee_role) }
-    let(:individual_market_transition) { FactoryGirl.create(:individual_market_transition, person: person) }
     let(:employee_role) { FactoryGirl.build_stubbed(:employee_role) }
     let(:census_employee) { FactoryGirl.create(:census_employee, :with_active_assignment, benefit_sponsorship: benefit_sponsorship, employer_profile: benefit_sponsorship.profile, benefit_group: current_benefit_package ) }
     let(:benefit_group_assignment) { census_employee.active_benefit_group_assignment }
@@ -498,8 +494,6 @@ RSpec.describe "insured/group_selection/new.html.erb" do
     let(:person) { employee_role.person }
     let(:employee_role) { FactoryGirl.create(:employee_role) }
     let(:benefit_group) { FactoryGirl.create(:benefit_group) }
-    let(:individual_market_transition) { FactoryGirl.create(:individual_market_transition, person: person) }
-
 
     let(:hbx_enrollment) {HbxEnrollment.new}
     let(:coverage_household) { double("coverage household", coverage_household_members: []) }
@@ -675,8 +669,6 @@ RSpec.describe "insured/group_selection/new.html.erb" do
       allow(view).to receive(:dental_relationship_benefits).with(benefit_group).and_return ["employee"]
       allow(view).to receive(:can_employee_shop?).and_return(false)
       allow(person).to receive(:active_employee_roles).and_return [employee_role]
-      allow(person).to receive(:is_consumer_role_active?).and_return(false)
-      allow(person).to receive(:is_resident_role_active?).and_return(false)
       allow(view).to receive(:policy_helper).and_return(double("Policy", updateable?: true))
       allow(adapter).to receive(:can_shop_shop?).with(person).and_return(true)
       allow(adapter).to receive(:can_shop_both_markets?).with(person).and_return(false)

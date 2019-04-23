@@ -87,7 +87,8 @@ module Effective
         ],
         top_scope: :families
         }
-      end              
+      end
+                     
     end
   end
 end

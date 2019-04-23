@@ -1,6 +1,7 @@
 require "rails_helper"
 require File.join(Rails.root, "app", "data_migrations", "change_renewing_plan_year_aasm_state")
 
+
 describe ChangeRenewingPlanYearAasmState, dbclean: :after_each do
   skip "DEPRECATED rake was never updated to new model, check if we can remove it" do
 
@@ -113,14 +114,6 @@ describe ChangeRenewingPlanYearAasmState, dbclean: :after_each do
       expect(plan_year.aasm_state).to eq "active"
       expect(employer_profile.plan_years.map(&:aasm_state)).to eq ["expired", "active", "renewing_canceled"]
       expect(family.active_household.hbx_enrollments.map(&:aasm_state)).to eq ["coverage_expired", "coverage_enrolled"]
-    end
-
-    it "should update aasm_state of plan year to renewing_enrolling when ENV['py_state_to'] is set to renewing_draft" do
-      plan_year.update_attributes!(aasm_state:'renewing_canceled')
-      census_employee.reload
-      subject.migrate
-      plan_year.reload
-      expect(plan_year.aasm_state).to eq "renewing_enrolling"
     end
   end
  end

@@ -17,7 +17,6 @@ class InsuredEligibleForBenefitRule
     @benefit_package = benefit_package
     @coverage_kind = options[:coverage_kind].present? ? options[:coverage_kind] : 'health'
     @new_effective_on = options[:new_effective_on]
-    @market_kind = options[:market_kind]
   end
 
   def setup
@@ -42,18 +41,10 @@ class InsuredEligibleForBenefitRule
     if @role.class.name == "ConsumerRole" || @role.class.name == "ResidentRole"
       @errors = []
       status = @benefit_package.benefit_eligibility_element_group.class.fields.keys.reject{|k| k == "_id"}.reduce(true) do |eligible, element|
-        if @market_kind == "shop" && !("#{element}" == "active_consumer")
-          if self.public_send("is_#{element}_satisfied?")
-            true && eligible
-          end
-        elsif self.public_send("is_#{element}_satisfied?")
+        if self.public_send("is_#{element}_satisfied?")
           true && eligible
         else
-          if "#{element}" == "active_consumer"
-             @errors << ["eligibility failed on market kind"]
-          else
-            @errors << ["eligibility failed on #{element}"]
-          end
+          @errors << ["eligibility failed on #{element}"]
           false
         end
       end
@@ -85,12 +76,11 @@ class InsuredEligibleForBenefitRule
   end
 
   def is_cost_sharing_satisfied?
-    tax_households = @role.latest_active_tax_households_with_year(@benefit_package.effective_year, @family)
-    return true if tax_households.blank?
+    tax_household = @role.latest_active_tax_household_with_year(@benefit_package.effective_year, @family)
+    return true if tax_household.blank?
 
-    #TODO Multi TaxHouseholds pick the right tax_household if tax_households count more than 1
     cost_sharing = @benefit_package.cost_sharing
-    csr_kind = tax_households.first.current_csr_eligibility_kind
+    csr_kind = tax_household.current_csr_eligibility_kind
     return true if csr_kind.blank? || cost_sharing.blank?
     csr_kind == cost_sharing
   end
@@ -150,7 +140,7 @@ class InsuredEligibleForBenefitRule
 
   def is_incarceration_status_satisfied?
     return true if @benefit_package.incarceration_status.include?("any")
-    @benefit_package.incarceration_status.include?("unincarcerated") && (@role.is_incarcerated == false)
+    @benefit_package.incarceration_status.include?("unincarcerated") && !@role.is_incarcerated?
   end
 
   def is_age_range_satisfied?
@@ -161,11 +151,6 @@ class InsuredEligibleForBenefitRule
 
   def is_lawful_presence_status_satisfied?
     is_verification_satisfied? || is_person_vlp_verified?
-  end
-
-  def is_active_individual_role_satisfied?
-    return (@role.person.is_resident_role_active? || @role.person.is_consumer_role_active?) if @market_kind == "coverall"
-    return @role.person.is_consumer_role_active? if @market_kind == "individual"
   end
 
   def determination_results

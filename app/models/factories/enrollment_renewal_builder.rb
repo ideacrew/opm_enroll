@@ -65,6 +65,7 @@ module Factories
         renewal_enrollment.waiver_reason = active_enrollment.waiver_reason
         renewal_enrollment.waive_coverage
       end
+
       renewal_enrollment.hbx_enrollment_members = clone_enrollment_members(active_enrollment, renewal_enrollment)
       renewal_enrollment
     end

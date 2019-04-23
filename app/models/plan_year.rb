@@ -23,15 +23,6 @@ class PlanYear
   INITIAL_ENROLLING_STATE = %w(publish_pending eligibility_review published published_invalid enrolling enrolled)
   INITIAL_ELIGIBLE_STATE  = %w(published enrolling enrolled)
 
-  VOLUNTARY_TERMINATED_PLAN_YEAR_EVENT_TAG = "benefit_coverage_period_terminated_voluntary"
-  VOLUNTARY_TERMINATED_PLAN_YEAR_EVENT = "acapi.info.events.employer.benefit_coverage_period_terminated_voluntary"
-
-  NON_PAYMENT_TERMINATED_PLAN_YEAR_EVENT_TAG = "benefit_coverage_period_terminated_nonpayment"
-  NON_PAYMENT_TERMINATED_PLAN_YEAR_EVENT = "acapi.info.events.employer.benefit_coverage_period_terminated_nonpayment"
-
-  INITIAL_OR_RENEWAL_PLAN_YEAR_DROP_EVENT_TAG="benefit_coverage_renewal_carrier_dropped"
-  INITIAL_OR_RENEWAL_PLAN_YEAR_DROP_EVENT="acapi.info.events.employer.benefit_coverage_renewal_carrier_dropped"
-
   # Plan Year time period
   field :start_on, type: Date
   field :end_on, type: Date
@@ -40,7 +31,6 @@ class PlanYear
   field :open_enrollment_end_on, type: Date
 
   field :terminated_on, type: Date
-  field :termination_kind, type: String
 
   field :imported_plan_year, type: Boolean, default: false
 
@@ -128,8 +118,10 @@ class PlanYear
 
   def update_employee_benefit_packages
     if self.start_on_changed?
-      census_employees_within_play_year.each do |census_employee|
-        census_employee.benefit_group_assignments.where(:benefit_group_id.in => benefit_group_ids).each do |assignment|
+      bg_ids = self.benefit_groups.pluck(:_id)
+      employees = CensusEmployee.where({ :"benefit_group_assignments.benefit_group_id".in => bg_ids })
+      employees.each do |census_employee|
+        census_employee.benefit_group_assignments.where(:benefit_group_id.in => bg_ids).each do |assignment|
           assignment.update(start_on: self.start_on)
           assignment.update(end_on: self.end_on) if assignment.end_on.present?
         end
@@ -888,7 +880,6 @@ class PlanYear
     state :expired              # Non-published plans are expired following their end on date
     state :canceled,          :after_enter => :cancel_application             # Published plan open enrollment has ended and is ineligible for coverage
     state :active               # Published plan year is in-force
-    state :termination_pending
 
     state :renewing_draft#, :after_enter => :renewal_group_notice # renewal_group_notice - Sends a notice three months prior to plan year renewing
     state :renewing_published
@@ -983,8 +974,8 @@ class PlanYear
     end
 
     # Enrollment processed stopped due to missing binder payment
-    event :cancel, :after => [:record_transition, :update_end_date, :notify_cancel_event] do
-      transitions from: [:draft, :published, :publish_pending, :eligibility_review, :published_invalid, :application_ineligible, :enrolling, :enrolled, :active], to: :canceled, :after => [:cancel_employee_enrollments, :cancel_employee_benefit_packages]
+    event :cancel, :after => :record_transition do
+      transitions from: [:draft, :published, :enrolling, :enrolled, :active], to: :canceled
     end
 
     # Coverage disabled due to non-payment
@@ -1003,7 +994,7 @@ class PlanYear
 
     # Coverage reinstated
     event :reinstate_plan_year, :after => :record_transition do
-      transitions from: [:terminated,:termination_pending], to: :active, after: :reset_termination_and_end_date
+      transitions from: :terminated, to: :active, after: :reset_termination_and_end_date
     end
 
     event :renew_plan_year, :after => :record_transition do
@@ -1034,20 +1025,12 @@ class PlanYear
         :renewing_application_ineligible, :renewing_enrolled], to: :renewing_draft, :after => [:cancel_enrollments]
     end
 
-    event :cancel_renewal, :after => [:record_transition, :update_end_date, :notify_cancel_event] do
-      transitions from: [:renewing_draft, :renewing_published, :renewing_enrolling, :renewing_application_ineligible, :renewing_enrolled, :renewing_publish_pending], to: :renewing_canceled, :after => [:cancel_employee_enrollments, :cancel_employee_benefit_packages]
+    event :cancel_renewal, :after => :record_transition do
+      transitions from: [:renewing_draft, :renewing_published, :renewing_enrolling, :renewing_application_ineligible, :renewing_enrolled, :renewing_publish_pending], to: :renewing_canceled
     end
 
     event :conversion_expire, :after => :record_transition do
       transitions from: [:expired, :active], to: :conversion_expired, :guard => :can_be_migrated?
-    end
-
-    event :close_open_enrollment, :after => :record_transition do 
-      transitions from: :enrolling, to: :enrolled,                :guards => [:is_enrollment_valid?]
-      transitions from: :enrolling, to: :application_ineligible,  :after => [:initial_employer_ineligibility_notice, :notify_employee_of_initial_employer_ineligibility]
-
-      transitions from: :renewing_enrolling,  to: :renewing_enrolled,   :guards => [:is_enrollment_valid?]
-      transitions from: :renewing_enrolling,  to: :renewing_application_ineligible, :after => [:renewal_employer_ineligibility_notice, :zero_employees_on_roster]
     end
   end
 
@@ -1057,15 +1040,12 @@ class PlanYear
     end
   end
 
-  def set_plan_year_termination_date(end_on, options = {})
-    self.end_on = end_on
-    self.terminated_on = options[:terminated_on]
-    self.termination_kind= options[:termination_kind]
-    self.save!
-  end
-
   def trigger_passive_renewals
-    notify("acapi.info.events.plan_year.employee_passive_renewals_requested", {:plan_year_id => self.id.to_s})
+    open_enrollment_factory = Factories::EmployerOpenEnrollmentFactory.new
+    open_enrollment_factory.employer_profile = self.employer_profile
+    open_enrollment_factory.date = TimeKeeper.date_of_record
+    open_enrollment_factory.renewing_plan_year = self
+    open_enrollment_factory.process_family_enrollment_renewals
   end
 
   def revert_employer_profile_application
@@ -1159,46 +1139,6 @@ class PlanYear
     end
   end
 
-  def send_employee_renewal_invites
-    benefit_groups.each do |bg|
-      bg.census_employees.non_terminated.each do |ce|
-        Invitation.invite_renewal_employee!(ce)
-      end
-    end
-  end
-
-  def send_employee_initial_enrollment_invites
-    benefit_groups.each do |bg|
-      bg.census_employees.non_terminated.each do |ce|
-        Invitation.invite_initial_employee!(ce)
-      end
-    end
-  end
-
-  def send_active_employee_invites
-    benefit_groups.each do |bg|
-      bg.census_employees.non_terminated.each do |ce|
-        Invitation.invite_employee!(ce)
-      end
-    end
-  end
-  
-  def notify_cancel_event(transmit_xml = false)
-    return unless transmit_xml
-    transition = self.latest_workflow_state_transition
-    if TimeKeeper.date_of_record < start_on
-      if transition.from_state == "enrolled" && open_enrollment_completed? && binder_paid? && past_transmission_threshold?
-        notify_employer_py_cancellation
-      elsif transition.from_state == "renewing_enrolled" && open_enrollment_completed? && past_transmission_threshold?
-        notify_employer_py_cancellation
-      end
-    else
-      if transition.from_state == "active"
-        notify_employer_py_cancellation
-      end
-    end
-  end
-
   alias_method :external_plan_year?, :can_be_migrated?
 
   def estimate_group_size?
@@ -1244,24 +1184,6 @@ class PlanYear
   end
 
   private
-
-  def notify_employer_py_cancellation
-    notify(INITIAL_OR_RENEWAL_PLAN_YEAR_DROP_EVENT, {employer_id: self.employer_profile.hbx_id, plan_year_id: self.id.to_s, event_name: INITIAL_OR_RENEWAL_PLAN_YEAR_DROP_EVENT_TAG})
-  end
-
-  def notify_employer_py_terminate(transmit_xml)
-
-    return unless transmit_xml
-    return unless self.termination_pending? || self.terminated?
-
-    if self.termination_kind == "voluntary"
-      notify(VOLUNTARY_TERMINATED_PLAN_YEAR_EVENT, {employer_id: self.employer_profile.hbx_id, event_name: VOLUNTARY_TERMINATED_PLAN_YEAR_EVENT_TAG})
-    end
-
-    if self.termination_kind == "nonpayment"
-      notify(NON_PAYMENT_TERMINATED_PLAN_YEAR_EVENT, {employer_id: self.employer_profile.hbx_id, event_name: NON_PAYMENT_TERMINATED_PLAN_YEAR_EVENT_TAG})
-    end
-  end
 
   def log_message(errors)
     msg = yield.first
@@ -1321,13 +1243,13 @@ class PlanYear
     event_name = aasm.current_event.to_s.gsub(/!/, '')
     if event_name == "publish"
       begin
-        self.employer_profile.trigger_notices("planyear_renewal_3a", "acapi_trigger" =>  true)
+        self.employer_profile.trigger_notices("planyear_renewal_3a")
       rescue Exception => e
         Rails.logger.error { "Unable to deliver employer renewal publish notice for #{self.employer_profile.organization.legal_name} due to #{e}" }
       end
     elsif event_name == "force_publish"
       begin
-        self.employer_profile.trigger_notices("planyear_renewal_3b", "acapi_trigger" =>  true)
+        self.employer_profile.trigger_notices("planyear_renewal_3b")
       rescue Exception => e
         Rails.logger.error { "Unable to deliver employer renewal force publish notice for #{self.employer_profile.organization.legal_name} due to #{e}" }
       end
@@ -1345,7 +1267,7 @@ class PlanYear
       end
     else
       begin
-        self.employer_profile.trigger_notices("group_renewal_5", "acapi_trigger" => true)
+        self.employer_profile.trigger_notices("group_renewal_5")
       rescue Exception => e
         Rails.logger.error { "Unable to deliver employer group_renewal_5 notice for #{self.employer_profile.organization.legal_name} due to #{e}" }
       end
@@ -1388,36 +1310,12 @@ class PlanYear
     self.employer_profile.trigger_notices("renewal_employer_open_enrollment_completed")
   end
 
-  def renewal_employee_enrollment_confirmation
-    self.employer_profile.census_employees.non_terminated.each do |ce|
-      begin
-        enrollments = ce.renewal_benefit_group_assignment.hbx_enrollments
-        if enrollments.present? && enrollments.select { |enr| enr.effective_on == start_on}.present?
-          ShopNoticesNotifierJob.perform_later(ce.id.to_s, "renewal_employee_enrollment_confirmation", "acapi_trigger" => true)
-        end
-      rescue Exception => e
-        Rails.logger.error { "Unable to deliver renewal_employee_enrollment_confirmation to census_employee - #{ce.id} notice due to '#{e}' " }
-      end
-    end
-  end
-
   def renewal_employer_ineligibility_notice
     return true if benefit_groups.any? { |bg| bg.is_congress? }
     begin
-      self.employer_profile.trigger_notices("renewal_employer_ineligibility_notice", "acapi_trigger" =>  true)
+      self.employer_profile.trigger_notices("renewal_employer_ineligibility_notice")
     rescue Exception => e
       Rails.logger.error { "Unable to deliver employer renewal ineligiblity denial notice for #{self.employer_profile.organization.legal_name} due to #{e}" }
-    end
-  end
-
-  def renewal_employer_ineligibility_notice_to_employee
-    return true if benefit_groups.any?{|bg| bg.is_congress?}
-      self.employer_profile.census_employees.non_terminated.each do |ce|
-       begin
-         ShopNoticesNotifierJob.perform_later(ce.id.to_s, "renewal_employer_ineligibility_notice_to_employee", "acapi_trigger" =>  true)
-       rescue Exception => e
-         Rails.logger.error { "Unable to deliver employer renewal ineligiblity denial notice for #{self.employer_profile.organization.legal_name} due to #{e}" }
-      end
     end
   end
 
@@ -1448,6 +1346,30 @@ class PlanYear
       to_state: aasm.to_state,
       event: aasm.current_event
     )
+  end
+
+  def send_employee_renewal_invites
+    benefit_groups.each do |bg|
+      bg.census_employees.non_terminated.each do |ce|
+        Invitation.invite_renewal_employee!(ce)
+      end
+    end
+  end
+
+  def send_employee_initial_enrollment_invites
+    benefit_groups.each do |bg|
+      bg.census_employees.non_terminated.each do |ce|
+        Invitation.invite_initial_employee!(ce)
+      end
+    end
+  end
+
+  def send_active_employee_invites
+    benefit_groups.each do |bg|
+      bg.census_employees.non_terminated.each do |ce|
+        Invitation.invite_employee!(ce)
+      end
+    end
   end
 
   def send_employee_invites

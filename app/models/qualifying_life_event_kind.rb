@@ -18,7 +18,7 @@ class QualifyingLifeEventKind
   ## renamed property: kind to action_kind (also renamed associated constant)
 
 
-  ACTION_KINDS = %w[add_benefit add_member drop_member change_benefit terminate_benefit administrative transition_member]
+  ACTION_KINDS = %w[add_benefit add_member drop_member change_benefit terminate_benefit administrative]
   MarketKinds = %w[shop individual]
 
   # first_of_next_month: not subject to 15th of month effective date rule
@@ -57,9 +57,7 @@ class QualifyingLifeEventKind
     "exceptional_circumstances_system_outage",
     "exceptional_circumstances_domestic_abuse",
     "exceptional_circumstances_civic_service",
-    "exceptional_circumstances",
-    "eligibility_failed_or_documents_not_received_by_due_date",
-    "eligibility_documents_provided"
+    "exceptional_circumstances"
   ]
 
   field :event_kind_label, type: String

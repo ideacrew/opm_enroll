@@ -15,7 +15,7 @@ describe "insured/family_members/_dependent_form.html.erb" do
       person.save
       sign_in user
       @request.env['HTTP_REFERER'] = 'consumer_role_id'
-      allow(person).to receive(:is_consumer_role_active?).and_return true
+      allow(person).to receive(:has_active_consumer_role?).and_return true
       assign :person, person
       allow(view).to receive(:individual_market_is_enabled?).and_return(individual_market_is_enabled)
       allow(view).to receive(:policy_helper).and_return(double("Policy", updateable?: true))
@@ -67,6 +67,7 @@ describe "insured/family_members/_dependent_form.html.erb" do
     end
 
     it "should have no_ssn label" do
+      #allow(person).to receive(:has_active_consumer_role?).and_return true
       expect(rendered).to have_selector('span.no_ssn')
       expect(rendered).to match /have an SSN/
     end
@@ -76,11 +77,10 @@ describe "insured/family_members/_dependent_form.html.erb" do
     end
 
     it "should have required indicator for fields" do
-
       ["FIRST NAME", "LAST NAME", "DATE OF BIRTH"].each do |field|
         expect(rendered).to have_selector("input[placeholder='#{field} *']")
       end
-      expect(rendered).to have_selector("option", text: "choose")
+      expect(rendered).to have_selector("option", text: "This Person Is #{person.first_name}'s *")
     end
   end
 
@@ -88,10 +88,9 @@ describe "insured/family_members/_dependent_form.html.erb" do
     before :each do
       sign_in user
       @request.env['HTTP_REFERER'] = ''
-      allow(person).to receive(:is_consumer_role_active?).and_return false
+      allow(person).to receive(:has_active_consumer_role?).and_return false
       allow(person).to receive(:has_active_employee_role?).and_return true
       assign :person, person
-      assign :dependent, dependent
       allow(view).to receive(:policy_helper).and_return(double("Policy", updateable?: true))
       render "insured/family_members/dependent_form", dependent: dependent, person: person
     end
@@ -114,11 +113,11 @@ describe "insured/family_members/_dependent_form.html.erb" do
       ["FIRST NAME", "LAST NAME", "DATE OF BIRTH"].each do |field|
         expect(rendered).to have_selector("input[placeholder='#{field} *']")
       end
-      expect(rendered).to have_selector("option", text: "choose")
+      expect(rendered).to have_selector("option", text: "This Person Is #{person.first_name}'s *")
     end
 
     it "should not display the is_applying_coverage field option" do
-      expect(rendered).not_to match /Does this person need coverage?/
+      expect(rendered).not_to match /Is this person applying for coverage?/
     end
 
     it "should display the affirmative message" do

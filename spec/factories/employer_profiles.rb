@@ -59,7 +59,7 @@ FactoryGirl.define do
     sic_code '1111'
     transient do
       start_on TimeKeeper.date_of_record.beginning_of_month
-      plan_year_state 'active'
+      plan_year_state 'draft'
       renewal_plan_year_state 'renewing_draft'
       reference_plan_id { FactoryGirl.create(:plan).id }
       renewal_reference_plan_id { FactoryGirl.create(:plan).id }

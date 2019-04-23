@@ -21,7 +21,7 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
                             :primary_identifier => data.first["ic_ref"],
                             :title => "2017 Health Insurance Coverage and Preliminary Renewal Information"})
                           }
-  let(:valid_params) {{
+  let(:valid_parmas) {{
       :subject => application_event.title,
       :mpi_indicator => application_event.mpi_indicator,
       :event_name => application_event.event_name,
@@ -32,22 +32,21 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
   }}
   let!(:hbx_profile) { FactoryGirl.create(:hbx_profile, :open_enrollment_coverage_period) }
 
-  before :each do
-    allow(person.consumer_role).to receive("person").and_return(person)
-  end
-
   describe "New" do
+    before do
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+    end
     context "valid params" do
       it "should initialze" do
-        expect{IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_params)}.not_to raise_error
+        expect{IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_parmas)}.not_to raise_error
       end
     end
 
     context "invalid params" do
       [:mpi_indicator,:subject,:template].each do  |key|
         it "should NOT initialze with out #{key}" do
-          valid_params.delete(key)
-          expect{IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_params)}.to raise_error(RuntimeError,"Required params #{key} not present")
+          valid_parmas.delete(key)
+          expect{IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_parmas)}.to raise_error(RuntimeError,"Required params #{key} not present")
         end
       end
     end
@@ -55,7 +54,9 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
 
   describe "#build" do
     before do
-      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_parmas)
       @proj_eligibility_notice.build
     end
 
@@ -75,7 +76,9 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
 
   describe "#append_open_enrollment_data" do
     before do
-      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_parmas)
       @proj_eligibility_notice.build
     end
     it "return ivl open enrollment start on" do
@@ -90,7 +93,9 @@ RSpec.describe IvlNotices::SecondIvlRenewalNotice, :dbclean => :after_each do
 
   describe "#generate_pdf_notice" do
     before do
-      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @proj_eligibility_notice = IvlNotices::SecondIvlRenewalNotice.new(person.consumer_role, valid_parmas)
     end
 
     it "should render the projected eligibility notice template" do

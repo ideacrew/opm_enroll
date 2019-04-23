@@ -14,7 +14,7 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
   let!(:hbx_enrollment) {FactoryGirl.create(:hbx_enrollment, household: family.households.first, kind: "individual", plan: plan, aasm_state: "auto_renewing", effective_on: Date.new(year,1,1))}
   let!(:hbx_enrollment_member) {FactoryGirl.create(:hbx_enrollment_member, hbx_enrollment: hbx_enrollment, applicant_id: family.family_members.first.id, is_subscriber: true, eligibility_date: TimeKeeper.date_of_record.prev_month )}
   let!(:hbx_enrollment_member_1) {FactoryGirl.create(:hbx_enrollment_member, hbx_enrollment: hbx_enrollment_1, applicant_id: family.family_members.first.id, is_subscriber: true, eligibility_date: TimeKeeper.date_of_record.prev_month )}
-  let!(:hbx_enrollment_1) {FactoryGirl.create(:hbx_enrollment, household: family.households.first, kind: "individual", plan: plan, is_any_enrollment_member_outstanding: true, aasm_state: "coverage_selected", special_verification_period: TimeKeeper.date_of_record+95.days, effective_on: Date.new(TimeKeeper.date_of_record.year,1,1))}
+  let!(:hbx_enrollment_1) {FactoryGirl.create(:hbx_enrollment, household: family.households.first, kind: "individual", plan: plan, aasm_state: "enrolled_contingent", special_verification_period: TimeKeeper.date_of_record+95.days, effective_on: Date.new(TimeKeeper.date_of_record.year,1,1))}
   let(:application_event){ double("ApplicationEventKind",{
       :name =>'Final Eligibility Notice for UQHP/AQHP individuals',
       :notice_template => 'notices/ivl/final_eligibility_notice_uqhp_aqhp',
@@ -25,7 +25,7 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
       :person =>  person,
       :title => "Your Final Plan Enrollment, And Remainder To Pay"})
   }
-  let(:valid_params) {{
+  let(:valid_parmas) {{
       :subject => application_event.title,
       :mpi_indicator => application_event.mpi_indicator,
       :event_name => application_event.event_name,
@@ -34,22 +34,21 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
       :person => person
   }}
 
-  before :each do
-    allow(person.consumer_role).to receive("person").and_return(person)
-  end
-
   describe "New" do
+    before do
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+    end
     context "valid params" do
       it "should initialze" do
-        expect{IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_params)}.not_to raise_error
+        expect{IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_parmas)}.not_to raise_error
       end
     end
 
     context "invalid params" do
       [:mpi_indicator,:subject,:template].each do  |key|
         it "should NOT initialze with out #{key}" do
-          valid_params.delete(key)
-          expect{IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_params)}.to raise_error(RuntimeError,"Required params #{key} not present")
+          valid_parmas.delete(key)
+          expect{IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_parmas)}.to raise_error(RuntimeError,"Required params #{key} not present")
         end
       end
     end
@@ -57,7 +56,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
 
   describe "#pick_enrollments" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_parmas)
       person.consumer_role.update_attributes!(:aasm_state => "verification_outstanding")
       @final_eligibility_notice.append_data
     end
@@ -77,7 +78,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
 
   describe "#append_data" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_parmas)
       @final_eligibility_notice.append_data
     end
 
@@ -100,7 +103,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeRenewalUqhp, :dbclean => :after
 
   describe "#generate_pdf_notice" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeRenewalUqhp.new(person.consumer_role, valid_parmas)
     end
 
     it "should render the final eligibility notice template" do

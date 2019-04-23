@@ -26,7 +26,7 @@ describe CorrectInvalidBenefitGroupAssignmentsForEmployer, dbclean: :after_each 
     let(:census_employee) { employer_profile.census_employees.non_business_owner.first }
     let!(:benefit_group_assignment) {
       census_employee.active_benefit_group_assignment.update(is_active: false) 
-      ce = build(:benefit_group_assignment, census_employee: census_employee, start_on: benefit_start_on, end_on: benefit_end_on, aasm_state: "coverage_selected")
+      ce = build(:benefit_group_assignment, census_employee: census_employee, start_on: benefit_start_on, end_on: benefit_end_on)
       ce.save(:validate => false)
       ce
     }
@@ -36,7 +36,6 @@ describe CorrectInvalidBenefitGroupAssignmentsForEmployer, dbclean: :after_each 
 
     before(:each) do
       allow(ENV).to receive(:[]).with("fein").and_return(employer_profile.fein)
-      allow(ENV).to receive(:[]).with("action").and_return("corect_invalid_bga")
     end
 
     context "checking benefit group assignments", dbclean: :after_each do

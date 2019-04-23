@@ -22,8 +22,5 @@ describe FakesController do
       expect(end_month_rule).to eq end_month_rule
     end
 
-    it "marketkind should return shop" do
-      expect(qle.market_kind).to eq "shop"
-    end
   end
 end

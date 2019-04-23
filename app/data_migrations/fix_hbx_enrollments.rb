@@ -21,7 +21,7 @@ class FixHbxEnrollments < MongoidMigrationTask
   def fix_enrollment(enrollment)
     members = get_members(enrollment)
     if members.compact.present? && enrollment.present?
-      return enrollment.update_attributes!(is_any_enrollment_member_outstanding: true) if ((members.any?(&:verification_outstanding?) || members.any?(&:verification_period_ended?)) )
+      return enrollment.move_to_contingent! if ((members.any?(&:verification_outstanding?) || members.any?(&:verification_period_ended?)) &&  enrollment.may_move_to_contingent? )
     end
   end
 

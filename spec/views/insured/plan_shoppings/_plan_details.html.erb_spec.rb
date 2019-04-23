@@ -2,21 +2,9 @@ require 'rails_helper'
 
 =begin
 RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :after_each do
-  before :each do
-    allow_any_instance_of(FinancialAssistance::Application).to receive(:set_benchmark_plan_id)
-    sign_in(user)
-    allow(Caches::MongoidCache).to receive(:lookup).with(CarrierProfile, anything).and_return(carrier_profile)
-    assign(:person, person)
-    assign(:plan_hsa_status, plan_hsa_status)
-    assign(:hbx_enrollment, hbx_enrollment)
-    assign(:enrolled_hbx_enrollment_plan_ids, [plan.id])
-  end
-
   let(:carrier_profile) { instance_double("CarrierProfile", id: "carrier profile id", legal_name: "legal_name") }
   let(:user) { FactoryGirl.create(:user, person: person) }
-  let(:person) { FactoryGirl.create(:person) }
-  let(:family) { FactoryGirl.create(:family, :with_primary_family_member_and_dependent, person: person) }
-  let(:application) { FactoryGirl.create(:application, family: family) }
+  let(:person) { FactoryGirl.create(:person, :with_family ) }
 
   let(:plan) do
     double(plan_type: "ppo",
@@ -45,9 +33,7 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
   end
 
   let(:plan_hsa_status) { Hash.new }
-  let(:hbx_enrollment_member1) { double("HbxEnrollmentMember", applicant_id: family.family_members[0].id) }
-  let(:hbx_enrollment_member2) { double("HbxEnrollmentMember", applicant_id: family.family_members[1].id) }
-  let(:hbx_enrollment_members) { [hbx_enrollment_member1, hbx_enrollment_member2]}
+  let(:hbx_enrollment_members) { [double("HbxEnrollmentMember"), double("HbxEnrollmentMember")]}
   let(:hbx_enrollment) do
     instance_double(
       "HbxEnrollment", id: "hbx enrollment id",
@@ -55,18 +41,21 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
       plan: plan
     )
   end
-  let(:household) { family.households.first }
 
   before :each do
+    sign_in(user)
+    allow(Caches::MongoidCache).to receive(:lookup).with(CarrierProfile, anything).and_return(carrier_profile)
+    assign(:person, person)
+    assign(:plan_hsa_status, plan_hsa_status)
+    assign(:hbx_enrollment, hbx_enrollment)
+    assign(:enrolled_hbx_enrollment_plan_ids, [plan.id])
     assign(:carrier_names_map, {})
     allow(plan).to receive(:total_employee_cost).and_return 100
     allow(plan).to receive(:is_csr?).and_return false
-    application.update_attributes!(family: family)
-    tax_household = FactoryGirl.create(:tax_household, household: family.active_household)
-    tax_household.tax_household_members << TaxHouseholdMember.new(applicant_id: family.primary_applicant.id, is_ia_eligible: true)
-    FactoryGirl.create(:eligibility_determination, tax_household: tax_household)
-    tax_household.save!
-    assign(:tax_household, tax_household)
+    family = person.primary_family
+    active_household = family.households.first
+    tax_household = FactoryGirl.create(:tax_household, household: active_household )
+    eligibility_determination = FactoryGirl.create(:eligibility_determination, tax_household: tax_household )
   end
 
   context "deductible" do
@@ -85,15 +74,6 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
 
   context "without aptc" do
     before :each do
-      assign(:carrier_names_map, {})
-      assign(:person, person)
-      allow(plan).to receive(:total_employee_cost).and_return 100
-      allow(plan).to receive(:is_csr?).and_return false
-      family = person.primary_family
-      active_household = family.households.first
-      application.update_attributes!(family: family)
-      tax_household = FactoryGirl.create(:tax_household, household: household )
-      eligibility_determination = FactoryGirl.create(:eligibility_determination, tax_household: tax_household)
       render "insured/plan_shoppings/plan_details", plan: plan
     end
 
@@ -137,6 +117,7 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
     it "should have title text for standard plan " do
       expect(rendered).to match /#{Regexp.escape("Each health insurance company offers a standard plan at each metal level. Benefits and cost-sharing are the same among standard plans of the same metal level, but monthly premiums and provider network options may be different. This makes it easier for consumers to compare plans at the same metal level and choose what’s best for them.")}/i
     end
+
   end
 
   if ExchangeTestingConfigurationHelper.individual_market_is_enabled? 
@@ -173,6 +154,7 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
     it "should match fa-check-square for csr" do
       expect(rendered).to have_css("i.fa-check-square-o")
     end
+
   end
   end
 
@@ -180,9 +162,6 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
     before :each do
       allow(plan).to receive(:coverage_kind).and_return('dental')
       allow(plan).to receive(:metal_level).and_return('dental')
-      family = person.primary_family
-      application.update_attributes!(family: family)
-      tax_household = FactoryGirl.create(:tax_household, household: household )
       render "insured/plan_shoppings/plan_details", plan: plan
     end
 
@@ -190,20 +169,13 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
       expect(rendered).to have_selector('a', text:'Plan Summary')
       expect(rendered).to match "High"
     end
+
   end
 
   if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
   context "with tax household and eligibility determination of csr_94" do
     before :each do
       allow(view).to receive(:params).and_return :market_kind => 'individual'
-      view.instance_variable_set(:@eligibility_kind, "csr_94")
-      assign(:carrier_names_map, {})
-      allow(plan).to receive(:total_employee_cost).and_return 100
-      allow(plan).to receive(:is_csr?).and_return false
-      family = person.primary_family
-      application.update_attributes!(family: family)
-      tax_household = FactoryGirl.create(:tax_household, household: family.households.first , application_id: application.id)
-      eligibility_determination = FactoryGirl.create(:eligibility_determination, tax_household: tax_household, source: "Curam" )
       render "insured/plan_shoppings/plan_details", plan: plan
     end
 
@@ -215,11 +187,6 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
   context "with tax household and eligibility determination of csr_94 plan shopping in 'shop' market" do
     before :each do
       allow(view).to receive(:params).and_return :market_kind => 'shop'
-      family = person.primary_family
-      active_household = family.households.first
-      application.update_attributes!(family: family)
-      tax_household = FactoryGirl.create(:tax_household, household: household )
-      eligibility_determination = FactoryGirl.create(:eligibility_determination, tax_household: tax_household)
       render "insured/plan_shoppings/plan_details", plan: plan
     end
 
@@ -229,15 +196,8 @@ RSpec.describe "insured/plan_shoppings/_plan_details.html.erb", :dbclean => :aft
   end
 
   context "with tax household and eligibility determination of csr_100" do
+
     before :each do
-      assign(:carrier_names_map, {})
-      allow(plan).to receive(:total_employee_cost).and_return 100
-      allow(plan).to receive(:is_csr?).and_return false
-      family = person.primary_family
-      active_household = family.households.first
-      application.update_attributes!(family: family)
-      tax_household = FactoryGirl.create(:tax_household, household: household )
-      eligibility_determination = FactoryGirl.create(:eligibility_determination, tax_household: tax_household, csr_eligibility_kind: "csr_100", source: "Curam" )
       render "insured/plan_shoppings/plan_details", plan: plan
     end
 

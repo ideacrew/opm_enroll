@@ -30,20 +30,15 @@ RSpec.describe "insured/families/personal.html.erb" do
    let(:census_employee) {FactoryGirl.create(:census_employee)}
    let(:current_user) { FactoryGirl.create(:user, person: person) }
 
-    it "should renders home address fields" do
-      expect(response).to render_template("shared/_home_address_fields")
-    end
+   it "should renders home address fields" do
+    expect(response).to render_template("shared/_home_address_fields")
+   end
 
-    it_should_behave_like "display_heading"
+   it_should_behave_like "display_heading"
 
-    it "should display contact method dropdown " do
-      expect(rendered).to have_select("person[employee_roles_attributes][0][contact_method]", :selected => "Paper and Electronic communications")
-    end
-
-    it "should display language preference dropdown " do
-      expect(rendered).to have_select("person[employee_roles_attributes][0][language_preference]", :selected => "English")
-    end
-  end
+   it "should display contact method dropdown " do
+    expect(rendered).to have_select("person[employee_roles_attributes][0][contact_method]", :selected => "Paper and Electronic communications")
+   end
 
    it "should display language preference dropdown " do
     expect(rendered).to have_select("person[employee_roles_attributes][0][language_preference]", :selected => "English")

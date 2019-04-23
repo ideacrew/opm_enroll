@@ -7,8 +7,6 @@ class Exchanges::ResidentsController < ApplicationController
   before_action :find_resident_role, only: [:edit, :update]
   before_action :authorize_user
 
-  after_action :create_initial_market_transition, only: [:create]
-
   def index
     @resident_enrollments = Person.where(:resident_enrollment_id.nin =>  ['', nil]).map(&:resident_enrollment)
 
@@ -103,7 +101,7 @@ class Exchanges::ResidentsController < ApplicationController
       redirect_to search_exchanges_residents_path
       return
     end
-
+    
     respond_to do |format|
       format.html {
         redirect_to :action => "edit", :id => @resident_role.id
@@ -167,7 +165,7 @@ class Exchanges::ResidentsController < ApplicationController
   end
 
   def authorize_user
-    authorize ResidentRole
+    authorize ResidentRole 
   end
 
   def person_parameters_list
@@ -198,19 +196,8 @@ class Exchanges::ResidentsController < ApplicationController
       :indian_tribe_member,
       :tribal_id,
       :no_dc_address,
-      :is_homeless,
-      :is_temporarily_out_of_state
+      :no_dc_address_reason
     ]
-  end
-
-  def create_initial_market_transition
-    transition = IndividualMarketTransition.new
-    transition.role_type = "resident"
-    transition.submitted_at = TimeKeeper.datetime_of_record
-    transition.reason_code = "generating_resident_role"
-    transition.effective_starting_on = TimeKeeper.datetime_of_record
-    transition.user_id = current_user.id
-    Person.find(session[:person_id]).individual_market_transitions << transition
   end
 
 

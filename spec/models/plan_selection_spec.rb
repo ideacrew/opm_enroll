@@ -118,6 +118,5 @@ if ExchangeTestingConfigurationHelper.individual_market_is_enabled?
         end
       end
     end
-
   end
 end

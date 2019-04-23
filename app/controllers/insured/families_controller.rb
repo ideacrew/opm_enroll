@@ -9,14 +9,12 @@ class Insured::FamiliesController < FamiliesController
   before_action :check_employee_role
   before_action :find_or_build_consumer_role, only: [:home]
   before_action :calculate_dates, only: [:check_move_reason, :check_marriage_reason, :check_insurance_reason]
-  before_filter :load_support_texts, only: [:personal, :manage_family]
 
   def home
     authorize @family, :show?
     build_employee_role_by_census_employee_id
     set_flash_by_announcement
     set_bookmark_url
-    set_admin_bookmark_url
     @active_sep = @family.latest_active_sep
 
     log("#3717 person_id: #{@person.id}, params: #{params.to_s}, request: #{request.env.inspect}", {:severity => "error"}) if @family.blank?
@@ -43,27 +41,11 @@ class Insured::FamiliesController < FamiliesController
 
   def manage_family
     set_bookmark_url
-    set_admin_bookmark_url
     @family_members = @family.active_family_members
-    @resident = @person.is_resident_role_active?
+    @resident = @person.has_active_resident_role?
     # @employee_role = @person.employee_roles.first
     @tab = params['tab']
 
-
-    respond_to do |format|
-      format.html
-    end
-  end
-
-  def family_relationships_matrix
-    set_bookmark_url
-    @family_members = @family.active_family_members
-    @people = @family.family_members.where(is_active: true).map(&:person)
-    @matrix = @family.build_relationship_matrix
-    @missing_relationships = @family.find_missing_relationships(@matrix)
-    @relationship_kinds = PersonRelationship::Relationships_UI
-    @all_relationships = @family.find_all_relationships(@matrix)
-    @tab = params['tab']
 
     respond_to do |format|
       format.html
@@ -105,7 +87,6 @@ class Insured::FamiliesController < FamiliesController
       special_enrollment_period.selected_effective_on = Date.strptime(params[:effective_on_date], "%m/%d/%Y") if params[:effective_on_date].present?
       special_enrollment_period.qualifying_life_event_kind = qle
       special_enrollment_period.qle_on = Date.strptime(params[:qle_date], "%m/%d/%Y")
-      special_enrollment_period.market_kind = qle.market_kind == "shop" ? "shop" : "ivl"
       special_enrollment_period.save
     end
 
@@ -119,16 +100,14 @@ class Insured::FamiliesController < FamiliesController
 
   def personal
     @tab = params['tab']
+
     @family_members = @family.active_family_members
-    @vlp_doc_subject = get_vlp_doc_subject_by_consumer_role(@person.consumer_role) if @person.is_consumer_role_active?
-    @person.consumer_role.build_nested_models_for_person if @person.is_consumer_role_active?
-    @person.resident_role.build_nested_models_for_person if @person.is_resident_role_active?
-    @resident = @person.is_resident_role_active?
-    if @tab.present?
-      respond_to do |format|
-        format.html
-        format.js
-      end
+    @vlp_doc_subject = get_vlp_doc_subject_by_consumer_role(@person.consumer_role) if @person.has_active_consumer_role?
+    @person.consumer_role.build_nested_models_for_person if @person.has_active_consumer_role?
+    @person.resident_role.build_nested_models_for_person if @person.has_active_resident_role?
+    @resident = @person.resident_role.present?
+    respond_to do |format|
+      format.html
     end
   end
 
@@ -137,15 +116,14 @@ class Insured::FamiliesController < FamiliesController
     @folder = params[:folder] || 'Inbox'
     @sent_box = false
     @provider = @person
-    @family_members = @family.active_family_members
   end
 
   def verification
-    @family_members = @person.primary_family.has_active_consumer_family_members
+    @family_members = @person.primary_family.family_members.active
   end
 
   def upload_application
-    @family_members = @person.primary_family.has_active_resident_family_members
+    @family_members = @person.primary_family.family_members.active
   end
 
   def check_qle_date
@@ -265,30 +243,8 @@ class Insured::FamiliesController < FamiliesController
 
   private
 
-  def trigger_ivl_to_cdc_transition_notice
-    person =  @family.primary_applicant.person
-    begin
-      IvlNoticesNotifierJob.perform_later(person.id.to_s, "ivl_to_coverall_transition_notice", {family: @family.id.to_s, result: {:people => @resident_people}} )
-    rescue Exception => e
-      Rails.logger.error { "Unable to deliver transition notice #{person.hbx_id} due to #{e.inspect}" }
-    end
-  end
-
-  def trigger_cdc_to_ivl_transition_notice
-    person =  @family.primary_applicant.person
-    begin
-      IvlNoticesNotifierJob.perform_later(person.id.to_s, "coverall_to_ivl_transition_notice", {family: @family.id.to_s, result: {:people => @consumer_people}} )
-    rescue Exception => e
-      Rails.logger.error { "Unable to deliver transition notice #{person.hbx_id} due to #{e.inspect}" }
-    end
-  end
-
   def updateable?
     authorize Family, :updateable?
-  end
-  
-  def load_support_texts
-    @support_texts = YAML.load_file("app/views/shared/support_text_household.yml")
   end
 
   def check_employee_role
@@ -327,8 +283,7 @@ class Insured::FamiliesController < FamiliesController
       if current_user.has_hbx_staff_role?
         @multiroles = @person.has_multiple_roles?
         @manually_picked_role = params[:market] ? params[:market] : "shop_market_events"
-        @qualifying_life_events += QualifyingLifeEventKind.send @manually_picked_role + '_admin' if @manually_picked_role == "shop_market_events"
-        @qualifying_life_events += QualifyingLifeEventKind.send @manually_picked_role + '_without_transition_member_action' if @manually_picked_role == "individual_market_events"
+        @qualifying_life_events += QualifyingLifeEventKind.send @manually_picked_role + '_admin' if @manually_picked_role
       else
         @multiroles = @person.has_multiple_roles?
         @manually_picked_role = params[:market] ? params[:market] : "shop_market_events"
@@ -360,20 +315,13 @@ class Insured::FamiliesController < FamiliesController
       if @person.addresses.blank?
         redirect_to edit_insured_employee_path(@person.active_employee_roles.first)
       end
-    elsif @person.is_consumer_role_active?
-      if !(@person.addresses.present? || @person.no_dc_address.present? || @person.no_dc_address_reason.present? || (@person.is_homeless || @person.is_temporarily_out_of_state))
+    elsif @person.has_active_consumer_role?
+      if !(@person.addresses.present? || @person.no_dc_address.present? || @person.no_dc_address_reason.present?)
         redirect_to edit_insured_consumer_role_path(@person.consumer_role)
-      elsif ridp_redirection
+      elsif @person.user && !@person.user.identity_verified?
         redirect_to ridp_agreement_insured_consumer_role_index_path
       end
     end
-  end
-
-  def ridp_redirection
-    return false if current_user.has_hbx_staff_role?
-    consumer = @person.consumer_role
-    not_verified = ((@person.user.present? ? @person.user.identity_verified? : false) || consumer.identity_verified?) ? false : true
-    @person.user && not_verified
   end
 
   def update_changing_hbxs(hbxs)

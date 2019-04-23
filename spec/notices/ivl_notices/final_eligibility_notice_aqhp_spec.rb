@@ -12,8 +12,6 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
   let(:family) {FactoryGirl.create(:family, :with_primary_family_member, person: person)}
   let(:plan) { FactoryGirl.create(:plan, :with_premium_tables, market: 'individual', metal_level: 'gold', csr_variant_id: '01', active_year: year, hios_id: "11111111122302-01") }
   let!(:hbx_enrollment) {FactoryGirl.create(:hbx_enrollment, household: family.households.first, kind: "individual", plan: plan, aasm_state: "auto_renewing", effective_on: Date.new(year,1,1))}
-  let!(:hbx_enrollment2) {FactoryGirl.create(:hbx_enrollment, household: family.households.first, kind: "individual", plan: plan, aasm_state: "coverage_selected", effective_on: Date.new(year-1,1,1))}
-
   let(:application_event){ double("ApplicationEventKind",{
                             :name =>'Final Eligibility Notice for AQHP individuals',
                             :notice_template => 'notices/ivl/final_eligibility_notice_aqhp',
@@ -24,33 +22,31 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
                             :person =>  person,
                             :title => "Your Final Eligibility Results, Plan, And Option TO Change Plans"})
                           }
-  let!(:valid_params) {{
+  let(:valid_parmas) {{
       :subject => application_event.title,
       :mpi_indicator => application_event.mpi_indicator,
       :event_name => application_event.event_name,
       :template => application_event.notice_template,
       :data => data,
-      :renewing_enrollments =>  [hbx_enrollment],
-      :active_enrollments => [hbx_enrollment2],
+      enrollments: [hbx_enrollment],
       :person => person
   }}
 
-  before :each do
-    allow(person.consumer_role).to receive("person").and_return(person)
-  end
-
   describe "New" do
+    before do
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+    end
     context "valid params" do
       it "should initialze" do
-        expect{IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_params)}.not_to raise_error
+        expect{IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_parmas)}.not_to raise_error
       end
     end
 
     context "invalid params" do
       [:mpi_indicator,:subject,:template].each do  |key|
         it "should NOT initialze with out #{key}" do
-          valid_params.delete(key)
-          expect{IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_params)}.to raise_error(RuntimeError,"Required params #{key} not present")
+          valid_parmas.delete(key)
+          expect{IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_parmas)}.to raise_error(RuntimeError,"Required params #{key} not present")
         end
       end
     end
@@ -58,7 +54,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
 
   describe "#build" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_parmas)
       @final_eligibility_notice.build
     end
 
@@ -77,7 +75,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
 
   describe "#append_open_enrollment_data" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_parmas)
       @final_eligibility_notice.build
     end
     it "return ivl open enrollment start on" do
@@ -90,7 +90,9 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
 
   describe "#generate_pdf_notice" do
     before do
-      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_params)
+      allow(person).to receive("primary_family").and_return(family)
+      allow(person.consumer_role).to receive_message_chain("person.families.first.primary_applicant.person").and_return(person)
+      @final_eligibility_notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person.consumer_role, valid_parmas)
     end
 
     it "should render the final eligibility notice template" do
@@ -105,31 +107,5 @@ RSpec.describe IvlNotices::FinalEligibilityNoticeAqhp, :dbclean => :after_each d
     end
   end
 
-  describe "for recipient, recipient_document_store", dbclean: :after_each do
-    let!(:person100)          { FactoryGirl.create(:person, :with_consumer_role, :with_work_email) }
-    let!(:dep_family1)        { FactoryGirl.create(:family, :with_primary_family_member, person: FactoryGirl.create(:person, :with_consumer_role, :with_work_email)) }
-    let!(:dep_family_member)  { FactoryGirl.create(:family_member, family: dep_family1, person: person100) }
-    let!(:family100)          { FactoryGirl.create(:family, :with_primary_family_member, person: person100) }
-    let(:dep_fam_primary)     { dep_family1.primary_applicant.person }
-
-    before :each do
-      valid_params.merge!({:person => person100})
-      @notice = IvlNotices::FinalEligibilityNoticeAqhp.new(person100.consumer_role, valid_params)
-    end
-
-    it "should have person100 as the recipient for the enrollment notice as this person is the primary" do
-      expect(@notice.recipient).to eq person100
-      expect(@notice.person).to eq person100
-      expect(@notice.recipient_document_store).to eq person100
-      expect(@notice.to).to eq person100.work_email_or_best
-    end
-
-    it "should not pick the dep_family1's primary person" do
-      expect(@notice.recipient).not_to eq dep_fam_primary
-      expect(@notice.person).not_to eq dep_fam_primary
-      expect(@notice.recipient_document_store).not_to eq dep_fam_primary
-      expect(@notice.to).not_to eq dep_fam_primary.work_email_or_best
-    end
-  end
 end
 end

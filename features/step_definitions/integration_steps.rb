@@ -6,12 +6,6 @@ When(/I use unique values/) do
   @u = UniqueValueStash::UniqueValues.new unless defined?(@u)
 end
 
-#Shows page with relevant CSS and javascripts loaded
-def show_page
-  save_page Rails.root.join( 'public', 'capybara.html' )
-  %x(launchy http://localhost:3000/capybara.html)
-end
-
 def people
   return @a if defined?(@a)
   @a = {
@@ -67,10 +61,6 @@ def people
     "Hbx Admin" => {
       email: 'admin@dc.gov',
       password: 'aA1!aA1!aA1!'
-    },
-    "Hbx Admin Tier 3" => {
-        email: 'themanda.tier3@dc.gov',
-        password: 'P@55word'
     },
     "Primary Broker" => {
       email: 'ricky.martin@example.com',
@@ -266,7 +256,7 @@ end
 
 Given(/^a Hbx admin with super admin access exists$/) do
   #Note: creates an enrollment for testing purposes in the UI
-  p_staff = Permission.create(name: 'hbx_staff', modify_family: true, modify_employer: true, revert_application: true, list_enrollments: true,
+  p_staff=Permission.create(name: 'hbx_staff', modify_family: true, modify_employer: true, revert_application: true, list_enrollments: true,
       send_broker_agency_message: true, approve_broker: true, approve_ga: true,
       modify_admin_tabs: true, view_admin_tabs: true, can_update_ssn: true, can_complete_resident_application: true)
   person = people['Hbx Admin']
@@ -711,7 +701,7 @@ When(/^.+ completes? the matched employee form for (.*)$/) do |named_person|
 end
 
 Then(/^.+ should see the dependents page$/) do
-  expect(page).to have_content('Add New Person')
+  expect(page).to have_content('Add Member')
   screenshot("dependents_page")
 end
 
@@ -740,7 +730,7 @@ end
 
 Then(/^.+ should see the new dependent form$/) do
 
-  expect(page).to have_content('CONFIRM MEMBER')
+  expect(page).to have_content('Confirm Member')
 end
 
 When(/^.+ enters? the dependent info of .+ daughter$/) do
@@ -771,7 +761,7 @@ end
 
 When(/^.+ clicks? confirm member$/) do
   all(:css, ".mz").last.click
-  expect(page).to have_link('Add New Person')
+  expect(page).to have_link('Add Member')
 end
 
 When(/^.+ clicks? continue on the dependents page$/) do

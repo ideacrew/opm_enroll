@@ -159,8 +159,6 @@ module Insured::FamiliesHelper
   def display_aasm_state?(enrollment)
     if enrollment.is_shop?
       true
-    elsif enrollment.is_ivl_actively_outstanding?
-      false
     else
       ['coverage_selected', 'coverage_canceled', 'coverage_terminated', 'auto_renewing', 'renewing_coverage_selected', 'coverage_expired'].include?(enrollment.aasm_state.to_s)
     end
@@ -181,11 +179,7 @@ module Insured::FamiliesHelper
         hbx_enrollment.benefit_group_assignment.benefit_group.end_on
       else
         benefit_coverage_period = HbxProfile.current_hbx.benefit_sponsorship.benefit_coverage_periods.by_date(hbx_enrollment.effective_on).first
-        if benefit_coverage_period
-          benefit_coverage_period.end_on
-        else
-          hbx_enrollment.effective_on.end_of_year
-        end
+        benefit_coverage_period.end_on
       end
     end
   end
@@ -240,54 +234,5 @@ module Insured::FamiliesHelper
       second_checked = !person.consumer_role.is_applying_coverage
     end
     return first_checked, second_checked
-  end
-
-  def current_market_kind(person)
-    if person.is_consumer_role_active? || person.is_resident_role_active?
-      person.active_individual_market_role
-    else
-      "No Consumer/CoverAll Market"
-    end
-  end
-
-  def new_market_kind(person)
-    if person.is_consumer_role_active?
-      "resident"
-    elsif person.is_resident_role_active?
-      "consumer"
-    else
-      " - "
-    end
-  end
-
-  #changing name from build_consumer_role to build_consumer to avoid conflict
-  def build_consumer(person, family)
-    if family.primary_applicant.person == person
-      person.build_consumer_role({:is_applicant => true})
-      person.save!
-    else
-      person.build_consumer_role({:is_applicant => false})
-      person.save!
-    end
-  end
-
-  def build_resident_role(person, family)
-    if family.primary_applicant.person == person
-      person.build_resident_role({:is_applicant => true})
-      person.save!
-    else
-      person.build_resident_role({:is_applicant => false})
-      person.save!
-    end
-  end
-
-  def transition_reason(person)
-    if person.is_consumer_role_active?
-    @qle = QualifyingLifeEventKind.where(reason: 'eligibility_failed_or_documents_not_received_by_due_date').first
-      { @qle.title => @qle.reason }
-    elsif person.is_resident_role_active?
-     @qle = QualifyingLifeEventKind.where(reason: 'eligibility_documents_provided').first
-     { @qle.title => @qle.reason }
-    end
   end
 end

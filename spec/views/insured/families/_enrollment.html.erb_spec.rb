@@ -245,7 +245,7 @@ RSpec.describe "insured/families/_enrollment.html.erb" do
                                  enroll_step: 1, subscriber: nil, coverage_terminated?: false,
                                  may_terminate_coverage?: true, effective_on: Date.new(2015,8,10),
                                  consumer_role: double, applied_aptc_amount: 100, employee_role: employee_role, census_employee: census_employee,
-                                  aasm_state: 'coverage_selected', :is_ivl_actively_outstanding? => false)}
+                                 status_step: 2, aasm_state: 'coverage_selected')}
    let(:benefit_group) { FactoryGirl.create(:benefit_group) }
 
     before :each do

@@ -1,6 +1,6 @@
 <% content_for :horizontal_menu do %>
   <div class="mainmenu">
-    <div class="container" id="admin">
+    <div class="container">
       <ul role="tablist" class="list-unstyled list-inline" id="myTab">
       <li role="presentation"<%= menu_tab_class(active_tab, "hbx-profile-tab") %>>
         <%= link_to(main_app.exchanges_hbx_profiles_path, "aria-expanded" => "true", "aria-controls" => "hbx_profile", "role" => "tab" ) do  %>

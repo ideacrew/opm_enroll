@@ -69,155 +69,36 @@ body {
   display: none;
 }
 
-#admin{
-width:1470px;}
-
-#native-logo{
-width:60px;
-margin:10px;
-
-}
-#nm_title{
-color: $dark-blue;
-}
-#nm_title strong{
-font-size:30px;
-}
-#welcome .btn{
-  margin: 3px;
-}
-.home-button{
-}
-@media (min-width: 1200px) {
-  #carousel-container, #welcome{
-    width: 1170px;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-#welcome .btn{
-  font-size: 12px;
-}
-
-.carousel-control.left-nm {
-  background-image: -webkit-linear-gradient(left, rgba(0, 0, 0,0) 0%, rgba(0, 0, 0, .0001) 100%);
-  background-image:      -o-linear-gradient(left, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, .0001) 100%);
-  background-image: -webkit-gradient(linear, left top, right top, from(rgba(0, 0, 0, .1)), to(rgba(0, 0, 0, .0001)));
-  background-image:         linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, .0001) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#80000000', endColorstr='#00000000', GradientType=1);
-  background-repeat: repeat-x;
-}
-.carousel-control.right-nm {
-  right: 0;
-  left: auto;
-  background-image: -webkit-linear-gradient(left, rgba(0, 0, 0, .0001) 0%, rgba(0, 0, 0, 0) 100%);
-  background-image:      -o-linear-gradient(left, rgba(0, 0, 0, .0001) 0%, rgba(0, 0, 0, 0) 100%);
-  background-image: -webkit-gradient(linear, left top, right top, from(rgba(0, 0, 0, .0001)), to(rgba(0, 0, 0, .5)));
-  background-image:         linear-gradient(to right, rgba(0, 0, 0, .0001) 0%, rgba(0, 0, 0, 0) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#00000000', endColorstr='#80000000', GradientType=1);
-  background-repeat: repeat-x;
-}
-
-.navbar-native {
-  margin-bottom: 0;
-  height:90px;
-  background-color: $primary-button-text;
-  border-bottom: solid 10px #063C49;
-  .navbar-header {
-    .navbar-brand {
-      border-right: solid 2px #d7d7d7;
-      min-height: 80px;
-      img {
-        max-height: 75px;
-      }
-    }
-  }
-  
-  .navbar-collapse {
-    .header-text {
-      color: $primary-blue;
-      font-size: 14px;
-      text-transform: uppercase;
-      margin-top:20px;
-      font-weight: $primary-bold;
-    }
-    .navbar-nav:first-of-type {
-      a.portal {
-        text-align: center;
-        vertical-align: middle;
-        line-height: 100px;
-        font-size:20px;
-        padding: 23px 15px;
-        font-weight: 600;
-        &:hover {
-          text-decoration: none;
-        }
-      }
-    }
-    .navbar-right {
-      li:last-of-type {
-        text-align: right;
-      }
-      a.call-customer-service {
-        span:first-of-type {}
-        span:last-of-type {
-          .fa {
-            color: $primary-blue;
-          }
-          strong {
-            line-height: 0;
-            font-size: 16px;
-            color: $primary-black;
-          }
-        }
-      }
-      .my-portal-links {
-        min-height: 70px;
-        padding: 15px 15px;
-        display: block;
-        border-left: solid 1px #d7d7d7;
-        .users-name {
-          color: $primary-black;
-        }
-      }
-    }
-  }
-}
-
 .navbar {
   margin-bottom: 0;
-  height:90px;
   background-color: $primary-button-text;
   border-bottom: solid 3px $brand-primary;
   .navbar-header {
     .navbar-brand {
-      border-right: solid 2px #d7d7d7;
-      min-height: 80px;
+      border-right: solid 1px #d7d7d7;
+      min-height: 70px;
       img {
-        max-height: 55px;
+        max-height: 40px;
       }
     }
   }
-  
-  
   .navbar-collapse {
     .header-text {
       color: $primary-gray;
       font-size: 14px;
       text-transform: uppercase;
-      margin-top:20px;
       font-weight: $primary-bold;
     }
     .navbar-nav:first-of-type {
       a.portal {
         text-align: center;
         vertical-align: middle;
-        line-height: 100px;
-        font-size:20px;
+        line-height: 70px;
         padding: 23px 15px;
         font-weight: 600;
+        color: $primary-black;
         &:hover {
+          background-color: $background-hover;
           text-decoration: none;
         }
       }
@@ -342,11 +223,11 @@ fieldset[disabled] .btn-default.active {
 
 
 .label-info {
-  background-color: #2E2E2E;
+  background-color: #007bc4;
 }
 .label-info[href]:hover,
 .label-info[href]:focus {
-  background-color: #2E2E2E;
+  background-color: #007bc4;
 }
 
 .label-danger {

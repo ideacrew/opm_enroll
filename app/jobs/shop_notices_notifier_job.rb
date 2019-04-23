@@ -1,5 +1,4 @@
 class ShopNoticesNotifierJob < ActiveJob::Base
-  include Acapi::Notifiers
   queue_as :default
 
   def perform(recipient, event_object, notice_event, notice_params: {})

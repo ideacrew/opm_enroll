@@ -141,9 +141,7 @@ class PeopleController < ApplicationController
       @dependent = family.family_members.new(id: params[:family_member][:id], person: member)
       respond_to do |format|
         if member.save && @dependent.save
-          @dependent.person.add_relationship(@family.primary_applicant.person, params[:family_member][:primary_relationship], true)
-          @family.primary_applicant.person.add_relationship(@dependent.person, PersonRelationship::InverseMap[params[:family_member][:primary_relationship]])
-          # @person.person_relationships.create(kind: params[:family_member][:primary_relationship], relative_id: member.id) #old_code
+          @person.person_relationships.create(kind: params[:family_member][:primary_relationship], relative_id: member.id)
           family.households.first.coverage_households.first.coverage_household_members.find_or_create_by(applicant_id: params[:family_member][:id])
           format.js { flash.now[:notice] = "Family Member Added." }
         else
@@ -171,10 +169,8 @@ class PeopleController < ApplicationController
     if !@dependent.nil?
       @family_member_id = @dependent._id
       if !@dependent.is_primary_applicant
-        if @dependent.destroy
-          @dependent.remove_relationship
-        end
-        # @person.person_relationships.where(relative_id: @dependent.person_id).destroy_all
+        @dependent.destroy
+        @person.person_relationships.where(relative_id: @dependent.person_id).destroy_all
         @family.households.first.coverage_households.first.coverage_household_members.where(applicant_id: params[:id]).destroy_all
         @flash = "Family Member Removed"
       else
@@ -196,26 +192,20 @@ class PeopleController < ApplicationController
     @person = find_person(params[:id])
     @family = @person.primary_family
     @person.updated_by = current_user.oim_id unless current_user.nil?
-    if @person.is_consumer_role_active? && request.referer.include?("insured/families/personal")
+    if @person.has_active_consumer_role? && request.referer.include?("insured/families/personal")
       update_vlp_documents(@person.consumer_role, 'person')
       redirect_path = personal_insured_families_path
     else
       redirect_path = family_account_path
     end
-    @info_changed, @dc_status = sensitive_info_changed?(@person.consumer_role)
+    if @person.has_active_consumer_role?
+      @person.consumer_role.check_for_critical_changes(person_params, @family)
+    end
     respond_to do |format|
       if @person.update_attributes(person_params.except(:is_applying_coverage))
-        if @person.is_consumer_role_active?
-          @person.consumer_role.check_for_critical_changes(@family, info_changed: @info_changed, no_dc_address: person_params["no_dc_address"], dc_status: @dc_status)
-        end
         @person.consumer_role.update_attribute(:is_applying_coverage, person_params[:is_applying_coverage]) if @person.consumer_role.present?
-        if params[:page].eql? "from_registration"
-          format.js
-          format.html{redirect_to :back}
-        else
-          format.html { redirect_to redirect_path, notice: 'Person was successfully updated.' }
-          format.json { head :no_content }
-        end
+        format.html { redirect_to redirect_path, notice: 'Person was successfully updated.' }
+        format.json { head :no_content }
       else
         if @person.has_active_consumer_role?
           bubble_consumer_role_errors_by_person(@person)

@@ -7,10 +7,6 @@ class CreateRenewalPlanYearAndEnrollment < MongoidMigrationTask
        trigger_renewal_py_for_employers
        return
      end
-     feins = ENV['feins'].split(',').uniq if ENV['feins'].present?
-     feins.each do |fein|
-      organization = Organization.where(:'employer_profile'.exists=>true, fein: fein).first
-      action = ENV['action'].to_s
 
      organization = BenefitSponsors::Organizations::Organization.employer_profiles.where(fein: ENV['fein']).first
      action = ENV['action'].to_s

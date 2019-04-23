@@ -37,10 +37,6 @@ class EmployerProfile
   field :entity_kind, type: String
   field :sic_code, type: String
 
-  field :no_ssn, type: Boolean, default: false
-  field :enable_ssn_date, type: DateTime
-  field :disable_ssn_date, type: DateTime
-
 #  field :converted_from_carrier_at, type: DateTime, default: nil
 #  field :conversion_carrier_id, type: BSON::ObjectId, default: nil
 
@@ -188,10 +184,6 @@ class EmployerProfile
     @broker_agency_profile = active_broker_agency_account.broker_agency_profile if active_broker_agency_account.present?
   end
 
-  # def is_ssn_disabled?
-  #   no_ssn
-  # end
-
   def active_broker_agency_account
     return @active_broker_agency_account if defined? @active_broker_agency_account
     @active_broker_agency_account = broker_agency_accounts.detect { |account| account.is_active? }
@@ -312,7 +304,7 @@ class EmployerProfile
   end
 
   def dt_display_plan_year
-    plan_years.where(:aasm_state.nin => ['canceled','renewing_canceled']).order_by(:"start_on".desc).first || latest_plan_year
+    plan_years.where(:aasm_state.ne => "canceled").order_by(:"start_on".desc).first || latest_plan_year
   end
 
   def plan_year_drafts
@@ -344,7 +336,7 @@ class EmployerProfile
   end
 
   def find_plan_year_by_effective_date(target_date)
-    plan_year = (plan_years.published + plan_years.renewing_published_state + plan_years.where(:aasm_state.in => ["expired", "termination_pending"])).detect do |py|
+    plan_year = (plan_years.published + plan_years.renewing_published_state + plan_years.where(aasm_state: "expired")).detect do |py|
       (py.start_on.beginning_of_day..py.end_on.end_of_day).cover?(target_date)
     end
 
@@ -671,58 +663,26 @@ class EmployerProfile
       })
     end
 
-    def terminate_scheduled_plan_years
-
-      organizations = Organization.where(:"employer_profile.plan_years" => {:$elemMatch => {:end_on.lt => TimeKeeper.date_of_record, :aasm_state => "termination_pending"}})
-      organizations.each do |org|
-        begin
-          plan_years = org.employer_profile.plan_years.where(:aasm_state => "termination_pending", :end_on.lt => TimeKeeper.date_of_record)
-          plan_years.each do |py|
-            py.terminate!(py.end_on)
-            org.employer_profile.revert_application! if py.terminated? && org.employer_profile.may_revert_application?
-          end
-        rescue Exception => e
-          Rails.logger.error { "Unable to terminate plan year for #{org.legal_name} due to #{e.inspect}" }
-        end
-      end
-    end
-
     def advance_day(new_date)
       if !Rails.env.test?
-
-        # Terminates scheduled plan years
-        EmployerProfile.terminate_scheduled_plan_years
-
         plan_year_renewal_factory = Factories::PlanYearRenewalFactory.new
         organizations_eligible_for_renewal(new_date).each do |organization|
-          begin
-            plan_year_renewal_factory.employer_profile = organization.employer_profile
-            plan_year_renewal_factory.is_congress = false # TODO handle congress differently
-            plan_year_renewal_factory.renew
-          rescue Exception => e
-            Rails.logger.error { "Unable to renew plan year organizations_eligible_for_renewal for #{organization.legal_name} due to #{e}" }
-          end
+          plan_year_renewal_factory.employer_profile = organization.employer_profile
+          plan_year_renewal_factory.is_congress = false # TODO handle congress differently
+          plan_year_renewal_factory.renew
         end
 
         open_enrollment_factory = Factories::EmployerOpenEnrollmentFactory.new
         open_enrollment_factory.date = new_date
 
         organizations_for_open_enrollment_begin(new_date).each do |organization|
-          begin
-            open_enrollment_factory.employer_profile = organization.employer_profile
-            open_enrollment_factory.begin_open_enrollment
-          rescue Exception => e
-            Rails.logger.error { "Unable to begin_open_enrollment begin_open_enrollment begin_open_enrollment #{organization.legal_name} due to #{e}" }
-          end
+          open_enrollment_factory.employer_profile = organization.employer_profile
+          open_enrollment_factory.begin_open_enrollment
         end
 
         organizations_for_open_enrollment_end(new_date).each do |organization|
-          begin
-            open_enrollment_factory.employer_profile = organization.employer_profile
-            open_enrollment_factory.end_open_enrollment
-          rescue Exception => e
-            Rails.logger.error { "Unable to end_open_enrollment end_open_enrollment end_open_enrollment #{organization.legal_name} due to #{e}" }
-          end
+          open_enrollment_factory.employer_profile = organization.employer_profile
+          open_enrollment_factory.end_open_enrollment
         end
 #DC LOW ENROLLMENT NOTICE
         # organizations_for_low_enrollment_notice(new_date).each do |organization|
@@ -813,23 +773,7 @@ class EmployerProfile
 
           notify("acapi.info.events.employer.initial_employer_quiet_period_ended", {:effective_on => effective_on})
         end
-
-        if new_date.prev_day.day == Settings.aca.shop_market.initial_application.quiet_period_end_on
-          effective_on = new_date.prev_day.next_month.beginning_of_month.strftime("%Y-%m-%d")
-          notify("acapi.info.events.employer.initial_employer_quiet_period_ended", {:effective_on => effective_on})
-        end
-
-       #initial Employer's missing binder payment due date notices to Employer's and active Employee's.
-        start_on_for_missing_binder_payments = TimeKeeper.date_of_record.next_month.beginning_of_month
-        binder_next_day = PlanYear.calculate_open_enrollment_date(start_on_for_missing_binder_payments)[:binder_payment_due_date].next_day
-        if new_date == binder_next_day
-          initial_employers_enrolled_plan_year_state(start_on_for_missing_binder_payments).each do |org|
-            if !org.employer_profile.binder_paid?
-              notice_for_missing_binder_payment(org)
-            end
-          end
-        end
-      end       
+      end
 
       # Employer activities that take place monthly - on first of month
       if new_date.day == 1
@@ -917,7 +861,7 @@ class EmployerProfile
   end
 
   def default_benefit_group
-    plan_year_with_default = plan_years.where("benefit_groups.default" => true).order_by([:start_on]).last
+    plan_year_with_default = plan_years.where("benefit_groups.default" => true).first
     return unless plan_year_with_default
     plan_year_with_default.benefit_groups.detect{|bg| bg.default }
   end
@@ -1154,9 +1098,9 @@ class EmployerProfile
     ShopNoticesNotifierJob.perform_later(self.id.to_s, "out_of_pocker_url_notifier")
   end
 
-  def trigger_notices(event, options = {})
+  def trigger_notices(event)
     begin
-      ShopNoticesNotifierJob.perform_later(self.id.to_s, event, options)
+      ShopNoticesNotifierJob.perform_later(self.id.to_s, event)
     rescue Exception => e
       Rails.logger.error { "Unable to deliver #{event.humanize} notice #{self.legal_name} due to #{e}" }
     end
@@ -1288,7 +1232,7 @@ class EmployerProfile
       event: aasm.current_event
     )
   end
-   
+
   # TODO - fix premium amount
   def initialize_account
     if employer_profile_account.blank?

@@ -32,7 +32,6 @@ class Employers::CensusEmployeesController < ApplicationController
     @census_employee.build_address unless @census_employee.address.present?
     @census_employee.build_email unless @census_employee.email.present?
     @census_employee.benefit_group_assignments.build unless @census_employee.benefit_group_assignments.present?
-    @no_ssn = @census_employee.no_ssn_allowed || false
   end
 
   def update
@@ -182,11 +181,6 @@ class Employers::CensusEmployeesController < ApplicationController
   def show
     @family = @census_employee.employee_role.person.primary_family if @census_employee.employee_role.present?
     @status = params[:status] || ''
-
-    if @no_ssn && !@employer_profile.no_ssn && @census_employee.encrypted_ssn.nil?
-      flash[:notice] = "This employee does not have an SSN because he/she was created at a time when an SSN was not required."
-    end
-
   end
 
   def delink
@@ -294,12 +288,11 @@ class Employers::CensusEmployeesController < ApplicationController
     @census_employee = CensusEmployee.find(id)
   end
 
-  def build_census_employee(employer_profile_id = nil)
+  def build_census_employee
     @census_employee = CensusEmployee.new
     @census_employee.build_address
     @census_employee.build_email
     @census_employee.benefit_group_assignments.build
-    @census_employee.employer_profile_id = employer_profile_id
     @census_employee
   end
 

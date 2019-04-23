@@ -109,20 +109,15 @@ class QhpBuilder
   def iterate_plans
     update_dental_plans
     # @qhp_hash[:packages_list][:packages].each do |plans|
-    counter = 0
-    total_qhp = @qhp_array.count
     @qhp_array.each do |plans|
-      counter = counter + 1
       @plans = plans
       @xml_plan_counter += plans[:plans_list][:plans].size
       plans[:plans_list][:plans].each do |plan|
         @plan = plan
         @carrier_name = plans[:plans_list][:carrier_name]
         build_qhp_params
-        print "\r#{(counter.to_f/total_qhp).round(1)*100}% complete" unless Rails.env.test?
       end
     end
-    puts "" unless Rails.env.test?
   end
 
   def build_qhp_params
@@ -170,7 +165,7 @@ class QhpBuilder
     plan = candidate_plans.sort_by do |plan| plan.hios_id.gsub('-','').to_i end.first
     plans_to_update = Plan.where(active_year: @plan_year, hios_id: /#{@qhp.standard_component_id.strip}/).to_a
     plans_to_update.each do |up_plan|
-      # nation_wide, dc_in_network = parse_nation_wide_and_dc_in_network
+      nation_wide, dc_in_network = parse_nation_wide_and_dc_in_network
       up_plan.update_attributes(
           # name: @qhp.plan_marketing_name.squish!,
           hios_id: up_plan.coverage_kind == "dental" ? up_plan.hios_id.split("-").first : up_plan.hios_id,
@@ -180,8 +175,8 @@ class QhpBuilder
           plan_type: @qhp.plan_type.downcase,
           deductible: @qhp.qhp_cost_share_variances.first.qhp_deductable.in_network_tier_1_individual,
           family_deductible: @qhp.qhp_cost_share_variances.first.qhp_deductable.in_network_tier_1_family,
-          # nationwide: nation_wide,
-          # dc_in_network: dc_in_network,
+          nationwide: nation_wide,
+          dc_in_network: dc_in_network,
           dental_level: @dental_metal_level
       )
       up_plan.save!

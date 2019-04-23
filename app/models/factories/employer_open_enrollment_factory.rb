@@ -53,7 +53,7 @@ module Factories
         ce.save!
       end
 
-      @employer_profile.census_employees.non_terminated.no_timeout.each do |ce|
+      @employer_profile.census_employees.non_terminated.each do |ce|
 
         begin
           if CensusEmployee::PENDING_STATES.include?(ce.aasm_state)
@@ -61,13 +61,7 @@ module Factories
           end
 
           @logger.debug "renewing: #{ce.full_name}"
-
-          if ce.ssn.present?
-            encrypted_ssn = Person.encrypt_ssn(ce.ssn)
-            person = Person.where(encrypted_ssn: encrypted_ssn).first
-          else
-            person = Person.where(first_name: /^#{ce.first_name}$/i, last_name: /^#{ce.last_name}$/i, dob: ce.dob).first
-          end
+          person = Person.where(encrypted_ssn: Person.encrypt_ssn(ce.ssn)).first
 
           if person.blank?
             employee_role, family = Factories::EnrollmentFactory.add_employee_role({

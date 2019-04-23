@@ -47,14 +47,6 @@ Rails.application.routes.draw do
       post :unlock, :change_password
     end
   end
-  
-  resources :users do
-    member do
-      get :reset_password, :lockable, :confirm_lock, :login_history, :change_username_and_email, :edit
-      put :confirm_reset_password, :confirm_change_username_and_email, :update
-      post :unlock, :change_password
-    end
-  end
 
   resources :saml, only: [] do
     collection do
@@ -63,62 +55,6 @@ Rails.application.routes.draw do
       get :navigate_to_assistance
     end
   end
-
-  namespace :financial_assistance do
-    resources :applications do
-      get :copy, on: :member
-      put :step, on: :member
-      put ':step/:step', on: :member, action: 'step'
-      post :step, on: :collection
-      get 'step/:step', on: :member, action: 'step', as: 'go_to_step'
-      get 'help_paying_coverage',on: :collection, action: 'help_paying_coverage', as: 'help_paying_coverage'
-      get 'application_checklist',on: :collection, action: 'application_checklist', as: 'application_checklist'
-      get 'get_help_paying_coverage_response',on: :collection, action: 'get_help_paying_coverage_response', as: 'get_help_paying_coverage_response'
-      get 'render_message',on: :collection, action: 'render_message', as: 'render_message'
-      get 'uqhp_flow',on: :collection, action: 'uqhp_flow', as: 'uqhp_flow'
-      get :review_and_submit, on: :member
-      get :review, on: :member
-      get :eligibility_results, on: :member
-      get :wait_for_eligibility_response, on: :member
-      get :check_eligibility_results_received, on: :member
-      get :application_publish_error, on: :member
-      get :eligibility_response_error, on: :member
-      get 'checklist_pdf',on: :collection, action: 'checklist_pdf', as: 'checklist_pdf'
-
-      resources :applicants do
-        put :step, on: :member
-        put ':step/:step', on: :member, action: 'step'
-        post :step, on: :collection
-        get 'step/:step', on: :member, action: 'step', as: 'go_to_step'
-        get :age_of_applicant
-        get :primary_applicant_has_spouse
-        get 'other_questions', on: :member, action: 'other_questions', as: 'other_questions'
-        get 'save_questions', on: :member, action: 'save_questions', as: 'save_questions'
-        post :update, on: :member
-
-        resources :incomes do
-          get 'other', on: :collection
-          put 'step(/:step)', action: 'step', on: :member
-          post :step, on: :collection
-          get 'step/:step', on: :member, action: 'step', as: 'go_to_step'
-        end
-
-        resources :benefits do
-          put 'step(/:step)', action: 'step', on: :member
-          post :step, on: :collection
-          get 'step/:step', on: :member, action: 'step', as: 'go_to_step'
-        end
-
-        resources :deductions do
-          put 'step(/:step)', action: 'step', on: :member
-          post :step, on: :collection
-          get 'step/:step', on: :member, action: 'step', as: 'go_to_step'
-        end
-      end
-    end
-  end
-
-  get 'payment_transactions/generate_saml_response', to: 'payment_transactions#generate_saml_response'
 
   namespace :exchanges do
 
@@ -215,12 +151,6 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :employer_applications do
-      put :terminate
-      put :cancel
-      put :reinstate
-    end
-
     resources :agents do
       collection do
         get :home
@@ -253,11 +183,6 @@ Rails.application.routes.draw do
     get 'paper_applications/upload', to: 'paper_applications#upload'
     post 'paper_applications/upload', to: 'paper_applications#upload'
     get 'paper_applications/download/:key', to: 'paper_applications#download'
-    get 'ridp_documents/upload', to: 'ridp_documents#upload'
-    post 'ridp_documents/upload', to: 'ridp_documents#upload'
-    get 'ridp_documents/download/:key', to: 'ridp_documents#download'
-    resources :ridp_documents, only: [:destroy]
-
 
     resources :plan_shoppings, :only => [:show] do
       member do
@@ -269,16 +194,10 @@ Rails.application.routes.draw do
         get 'waive'
         post 'terminate'
         post 'set_elected_aptc'
-        get 'plan_selection_callback'
       end
     end
 
-    resources :interactive_identity_verifications, only: [:create, :new, :update] do
-      collection do
-        get 'failed_validation'
-        get 'service_unavailable'
-      end
-    end
+    resources :interactive_identity_verifications, only: [:create, :new, :update]
 
     resources :inboxes, only: [:new, :create, :show, :destroy]
     resources :families, only: [:show] do
@@ -291,7 +210,6 @@ Rails.application.routes.draw do
       collection do
         get 'home'
         get 'manage_family'
-        get 'family_relationships_matrix'
         get 'personal'
         get 'inbox'
         get 'brokers'
@@ -308,8 +226,6 @@ Rails.application.routes.draw do
         get 'family'
         get 'upload_notice_form'
         post 'upload_notice'
-        get 'transition_family_members'
-        post 'transition_family_members_update'
       end
 
       resources :people do
@@ -326,8 +242,6 @@ Rails.application.routes.draw do
       post :match, on: :collection
       post :build, on: :collection
       get :ridp_agreement, on: :collection
-      post :update_application_type
-      get :upload_ridp_document, on: :collection
       get :immigration_document_options, on: :collection
       ##get :privacy, on: :collection
     end
@@ -518,7 +432,6 @@ Rails.application.routes.draw do
         get :new_staff_member
         get :new_broker_agency
         get :search_broker_agency
-        post :email_guide
       end
       member do
         get :favorite
@@ -643,7 +556,6 @@ Rails.application.routes.draw do
   match "hbx_profiles/edit_dob_ssn" => "exchanges/hbx_profiles#edit_dob_ssn", as: :edit_dob_ssn, via: [:get, :post]
   match "hbx_profiles/update_dob_ssn" => "exchanges/hbx_profiles#update_dob_ssn", as: :update_dob_ssn, via: [:get, :post], defaults: { format: 'js' }
   match "hbx_profiles/verify_dob_change" => "exchanges/hbx_profiles#verify_dob_change", as: :verify_dob_change, via: [:get], defaults: { format: 'js' }
-  match "hbx_profiles/create_eligibility" => "exchanges/hbx_profiles#create_eligibility", as: :create_eligibility, via: [:post], defaults: { format: 'js' }
 
   resources :families do
     get 'page/:page', :action => :index, :on => :collection
@@ -676,7 +588,6 @@ Rails.application.routes.draw do
       put :change_person_aasm_state
       get :show_docs
       put :update_verification_type
-      put :update_ridp_verification_type
       get :enrollment_verification
       put :extend_due_date
       get :fed_hub_request

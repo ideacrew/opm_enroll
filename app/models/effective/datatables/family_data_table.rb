@@ -62,7 +62,7 @@ module Effective
 
       def aptc_csr_link_type(family, allow)
         # return "disabled" # DISABLING APTC FEATURE.
-        family.active_household.latest_active_tax_households.first.present? && allow ? 'ajax' : 'disabled'
+        family.active_household.latest_active_tax_household.present? && allow ? 'ajax' : 'disabled'
       end
 
       def add_sep_link_type(allow)
@@ -76,11 +76,6 @@ module Effective
       def terminate_enrollment_type(family, allow)
         (family.all_enrollments.can_terminate.present? && allow) ? 'ajax' : 'disabled'
       end
-
-      def new_eligibility_family_member_link_type(row, allow)
-        allow && row.primary_applicant.person.has_active_consumer_role? ? 'ajax' : 'disabled'
-      end
-
 
       def nested_filter_definition
         families_tab = [

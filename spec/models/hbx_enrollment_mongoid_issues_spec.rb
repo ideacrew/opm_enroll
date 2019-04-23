@@ -8,7 +8,6 @@ describe Family, "with 2 policies", :dbclean => :around_each do
   let(:benefit_package) { hbx_profile.benefit_sponsorship.benefit_coverage_periods.first.benefit_packages.first }
 
   before :each do
-    DatabaseCleaner.clean
     TimeKeeper.set_date_of_record_unprotected!(Date.new(2015, 12, 15))
     family.add_family_member(primary.person, is_primary_applicant: true)
     family.save!

@@ -168,14 +168,6 @@ class CensusEmployee < CensusMember
    unclaimed_person ? linked_matched : unscoped.and(id: {:$exists => false})
   }
 
-  scope :matchable_by_dob_lname_fname, ->(dob, first_name, last_name) {
-    matched = unscoped.and(dob: dob, first_name: first_name, last_name: last_name, aasm_state: {"$in": ELIGIBLE_STATES })
-    benefit_group_assignment_ids = matched.flat_map() do |ee|
-      ee.published_benefit_group_assignment ? ee.published_benefit_group_assignment.id : []
-    end
-    matched.by_benefit_group_assignment_ids(benefit_group_assignment_ids)
-  }
-
   def initialize(*args)
     super(*args)
     write_attribute(:employee_relationship, "self")
@@ -287,10 +279,6 @@ class CensusEmployee < CensusMember
     return @employer_profile = EmployerProfile.find(self.employer_profile_id) if (self.employer_profile_id.present? && self.benefit_sponsors_employer_profile_id.blank?)
     return nil if self.benefit_sponsorship.blank? # Need this for is_case_old?
     @employer_profile = self.benefit_sponsorship.organization.employer_profile
-  end
-
-  def is_no_ssn_allowed?
-    employer_profile.try(:no_ssn) == true ? true : false
   end
 
   # This performs employee summary count for waived and enrolled in the latest plan year
@@ -441,7 +429,7 @@ class CensusEmployee < CensusMember
 
   def generate_and_save_to_temp_folder
     begin
-      url = Rails.application.config.checkbook_services_base_url
+      url = Settings.checkbook_services.url
       event_kind = ApplicationEventKind.where(:event_name => 'out_of_pocker_url_notifier').first
       notice_trigger = event_kind.notice_triggers.first
       builder = notice_trigger.notice_builder.camelize.constantize.new(self, {
@@ -459,7 +447,7 @@ class CensusEmployee < CensusMember
 
   def generate_and_deliver_checkbook_url
     begin
-      url = Rails.application.config.checkbook_services_base_url
+      url = Settings.checkbook_services.url
       event_kind = ApplicationEventKind.where(:event_name => 'out_of_pocker_url_notifier').first
       notice_trigger = event_kind.notice_triggers.first
       builder = notice_trigger.notice_builder.camelize.constantize.new(self, {
@@ -817,7 +805,7 @@ class CensusEmployee < CensusMember
           begin
             #exclude new hires
             next if (ce.new_hire_enrollment_period.cover?(date) || ce.new_hire_enrollment_period.first > date)
-            ShopNoticesNotifierJob.perform_later(ce.id.to_s, "employee_open_enrollment_reminder", "acapi_trigger" => true)
+            ShopNoticesNotifierJob.perform_later(ce.id.to_s, "employee_open_enrollment_reminder")
           rescue Exception => e
             (Rails.logger.error { "Unable to deliver open enrollment reminder notice to #{ce.full_name} due to #{e}" }) unless Rails.env.test?
           end
@@ -1346,14 +1334,6 @@ def self.to_csv
     unset("employee_role_id")
     self.benefit_group_assignments = []
     @employee_role = nil
-  end
-
-  def validate_unique_identifier
-    if ssn && ssn.size != 9 && no_ssn_allowed == false
-      errors.add(:ssn, "must be 9 digits.")
-    elsif ssn.blank? && no_ssn_allowed == false
-      errors.add(:ssn, "Can't be blank")
-    end
   end
 
   def notify_terminated

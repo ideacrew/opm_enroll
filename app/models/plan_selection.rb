@@ -46,7 +46,7 @@ class PlanSelection
 #    end
     hbx_enrollment.update_existing_shop_coverage
   end
-  
+
   def enrollment_members_verification_status(market_kind)
     members = hbx_enrollment.hbx_enrollment_members.flat_map(&:person).flat_map(&:consumer_role)
     if market_kind == "individual"

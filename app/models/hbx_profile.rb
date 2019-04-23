@@ -131,7 +131,7 @@ class HbxProfile
   CallCenterPhoneNumber = contact_center_phone_number
   ShortName = site_short_name
 
-  IndividualEnrollmentDueDayOfMonth = Settings.aca.individual_market.monthly_enrollment_due_on
+  IndividualEnrollmentDueDayOfMonth = 15
 
   #New Rule There is no 14 days rule for termination
   # IndividualEnrollmentTerminationMinimum = 14.days
@@ -238,3 +238,41 @@ class HbxProfile
     @inbox.messages.create(subject: welcome_subject, body: welcome_body)
   end
 end
+
+
+
+"Rice","Ann","08-02-1968","218003753","168245"
+"Sullivan","Laura",03-30-2001,"564002222","168246"
+"Evans","Antonio","01-16-2005","276001549","168247"
+Hughes,Irene,01-05-1980,654005069,"176027"
+Wood,Karen,09-22-1959,136006345,"18772833"
+Ross,Sarah,02-25-1956,701005392,"18772834"
+Russell,Sarah,10-02-1967,688003538,"18825992"
+Russell,Sarah,10-02-1967,535005143,"19755086"
+King,Janet,01-03-1998,622003512,"18828576"
+King,Janet,04-03-1998,657001443,"19755088"
+Gray,Elizabeth,01-09-2000,737003298,"18828575"
+Gray,Elizabeth,10-09-2000,296005076,"19755091"
+Alexander,Gloria,03-01-1977,748006109,"18839136"
+Reid,Donald,06-14-1982,732006838,"18839137"
+Berry,Rose,12-20-1964,523001174,"19746705"
+Little,Carolyn,02-08-1993,134004625,"19746709"
+Lane,Craig,07-01-1995,690004484,"19746710"
+Sims,Ryan,07-03-1997,539001356,19746711
+Owens,Tina,08-27-1954,188002525,19754881
+Webb,Angela,12-03-1961,732001333,19754010
+Greene,Jonathan,08-06-1965,106006732,19754015
+Greene,Virginia,09-05-1981,376006688,19756609
+Spencer,Barbara,11-30-1996,470006682,19776212
+Perry,Justin,03-25-1960,247003486,19746065
+Mitchell,Laura,08-25-1963,253006317,19972591
+Richardson,Gloria,07-18-1997,637004458,19974272
+Gray,Christine,08-02-1988,620002597,19985318
+Payne,Jesse,01-13-1983,615002592,20034525
+Day,Jose,11-06-1958,509003189,20035283
+Lopez,John,01-20-1966,703003986,20035284
+Carter,Lawrence,03-06-1999,193002864,20035285
+Meyer,Melissa,02-12-2001,671003601,20035286
+Gomez,Joshua,03-28-1979,413006292,20036596
+Jackson,Ronald,04-04-1983,427002931,20042470
+Murray,Janice,09-20-2019,574003600,20053686

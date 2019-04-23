@@ -59,14 +59,10 @@
       <% end %>
 
       <%= render_flash %>
-
       <div class="container">
         <%= yield :horizontal_status %>
-      </div>
 
-      <% if content_for? :content %>
-        <%= yield :content %>
-      <% else %>
+      </div>
         <%= yield %>
 
     </div>

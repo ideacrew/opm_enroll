@@ -28,7 +28,7 @@ RSpec.describe ShopEmployeeNotices::SepRequestDenialNotice, :dbclean => :after_e
                             :name =>'Denial of SEP Requested by EE outside of allowable time frame',
                             :notice_template => 'notices/shop_employee_notices/sep_request_denial_notice',
                             :notice_builder => 'ShopEmployeeNotices::SepRequestDenialNotice',
-                            :mpi_indicator => 'SHOP_D035',
+                            :mpi_indicator => 'MPI_SHOP35',
                             :event_name => 'sep_request_denial_notice',
                             :title => "Special Enrollment Period Denial"})
                           }
@@ -82,15 +82,31 @@ RSpec.describe ShopEmployeeNotices::SepRequestDenialNotice, :dbclean => :after_e
     let(:order) {[sep1,sep2]}
 
     before do
+      allow(census_employee.employer_profile).to receive_message_chain("staff_roles.first").and_return(person)
+      allow(census_employee.employee_role.person.primary_family).to receive_message_chain("special_enrollment_periods.order_by").and_return(order)
       @employee_notice = ShopEmployeeNotices::SepRequestDenialNotice.new(census_employee, valid_params)
+      sep1.qle_on = qle_on
+      sep1.end_on = end_on
+      sep1.title = "had a baby"
+      allow(census_employee).to receive(:active_benefit_group_assignment).and_return benefit_group_assignment
+      allow(HbxProfile).to receive(:current_hbx).and_return hbx_profile
+      allow(hbx_profile).to receive_message_chain(:benefit_sponsorship, :benefit_coverage_periods).and_return([bcp, renewal_bcp])
     end
 
     it "should append data" do
+      sep = census_employee.employee_role.person.primary_family.special_enrollment_periods.order_by(:"created_at".desc)[0]
+      
       @employee_notice.append_data
-      expect(@employee_notice.notice.sep.start_on).to eq qle_reported_date
-      expect(@employee_notice.notice.sep.end_on).to eq qle_reported_date+30.days
-      expect(@employee_notice.notice.sep.title).to eq title
+      expect(@employee_notice.notice.sep.qle_on).to eq qle_on
+      expect(@employee_notice.notice.sep.end_on).to eq end_on
+      expect(@employee_notice.notice.sep.title).to eq "had a baby"
+      
       expect(@employee_notice.notice.plan_year.start_on).to eq plan_year.start_on+1.year
+
+      expect(@employee_notice.notice.enrollment.ivl_open_enrollment_start_on).to eq bcp.open_enrollment_start_on
+      expect(@employee_notice.notice.enrollment.ivl_open_enrollment_end_on).to eq bcp.open_enrollment_end_on
+      expect(@employee_notice.notice.enrollment.effective_on).to eq bcp.start_on
+      expect(@employee_notice.notice.enrollment.plan_year).to eq bcp.plan_year.year
     end
   end
 end

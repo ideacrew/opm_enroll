@@ -484,10 +484,10 @@ module ApplicationHelper
   end
 
   def relationship_options(dependent, referer)
-    relationships = referer.include?("consumer_role_id") || @person.try(:is_consumer_role_active?) ?
+    relationships = referer.include?("consumer_role_id") || @person.try(:has_active_consumer_role?) ?
       BenefitEligibilityElementGroup::Relationships_UI - ["self"] :
       PersonRelationship::Relationships_UI
-    options_for_select(relationships.map{|r| [r.to_s.humanize, r.to_s] }, selected: dependent.family_member.try(:relationship))
+    options_for_select(relationships.map{|r| [r.to_s.humanize, r.to_s] }, selected: dependent.try(:relationship))
   end
 
   def enrollment_progress_bar(plan_year, p_min, options = {:minimum => true})
@@ -715,20 +715,6 @@ module ApplicationHelper
     end
   end
 
-  def human_boolean(boolean)
-    if boolean
-      'Yes'
-    elsif boolean == false
-      'No'
-    else
-      'N/A'
-    end
-  end
-
-  def current_year
-    TimeKeeper.date_of_record.year
-  end
-
   def is_new_paper_application?(current_user, app_type)
     current_user.has_hbx_staff_role? && app_type == "paper"
   end
@@ -739,22 +725,6 @@ module ApplicationHelper
 
   def previous_year
     TimeKeeper.date_of_record.prev_year.year
-  end
-
-  def resident_application_enabled?
-    if Settings.aca.individual_market.dc_resident_application
-      policy(:family).hbx_super_admin_visible?
-    else
-      false
-    end
-  end
-
-  def transition_family_members_link_type row, allow
-    if Settings.aca.individual_market.transition_family_members_link
-      allow && row.primary_applicant.person.has_consumer_or_resident_role? ? 'ajax' : 'disabled'
-    else
-      "disabled"
-    end
   end
 
   def convert_to_bool(val)

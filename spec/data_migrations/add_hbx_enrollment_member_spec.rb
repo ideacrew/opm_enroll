@@ -1,6 +1,5 @@
 require "rails_helper"
 require File.join(Rails.root, "app", "data_migrations", "add_hbx_enrollment_member")
-
 describe AddHbxEnrollmentMember, dbclean: :after_each do
   let(:given_task_name) { "add_hbx_enrollment_member" }
   subject { AddHbxEnrollmentMember.new(given_task_name, double(:current_scope => nil)) }
@@ -66,3 +65,7 @@ describe AddHbxEnrollmentMember, dbclean: :after_each do
     end
   end
 end
+
+
+
+

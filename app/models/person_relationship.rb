@@ -42,8 +42,7 @@ class PersonRelationship
     "stepparent",
     "trustee", # no inverse
     "unrelated",
-    "ward",
-    "stepson_or_stepdaughter"
+    "ward"
   ]
 
   Relationships_UI = [
@@ -84,13 +83,11 @@ class PersonRelationship
     "other_relationship" => "other_relationship",
     "cousin" => "cousin",
     "unrelated" => "unrelated",
-    "domestic_partner" => "domestic_partner",
 
     #one directional
     "foster_child" => "guardian",
     "court_appointed_guardian" => "ward",
-    "adopted_child" => "parent",
-    "stepson_or_stepdaughter" => "stepparent"
+    "adopted_child" => "parent"
   }
 
   SymmetricalRelationships = %W[head\ of\ household spouse ex-spouse cousin ward trustee annuitant other\ relationship other\ relative self]
@@ -99,9 +96,6 @@ class PersonRelationship
 
   field :relative_id, type: BSON::ObjectId
   field :kind, type: String
-  field :predecessor_id, type: BSON::ObjectId
-  field :successor_id, type: BSON::ObjectId
-  field :family_id, type: BSON::ObjectId
 
   validates_presence_of :relative_id, message: "Choose a relative"
   validates :kind,
@@ -109,32 +103,12 @@ class PersonRelationship
             allow_blank: false,
             allow_nil:   false,
             inclusion: {in: Kinds, message: "%{value} is not a valid person relationship"}
-  validate :check_predecessor_and_successor
 
   after_save :notify_updated
 
   def notify_updated
     person.notify_updated
   end
-
-  def check_predecessor_and_successor
-    errors.add(:successor, "can't be the same as predecessor") if successor_id == predecessor_id
-  end
-
-  #old_code
-  # def parent
-  #   raise "undefined parent class: Person" unless person?
-  #   self.person
-  # end
-
-  def predecessor
-    family.family_member.find(predecessor_id)
-  end
-
-  def successor
-    family.family_member.find(successor_id)
-  end
-
 
   def parent
     raise "undefined parent class: Person" unless person?
@@ -149,9 +123,7 @@ class PersonRelationship
 
   def relative
     return @relative if defined? @relative
-    @relative = Person.find(self.successor_id) unless self.successor_id.blank?
-    # return @relative if defined? @relative
-    # @relative = Person.find(self.relative_id) unless self.relative_id.blank?
+    @relative = Person.find(self.relative_id) unless self.relative_id.blank?
   end
 
   def invert_relationship

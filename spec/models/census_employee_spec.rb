@@ -95,14 +95,13 @@ RSpec.describe CensusEmployee, type: :model, dbclean: :after_each do
       end
     end
 
-    # No longer valid with NO SSN feature
-    # context "with no ssn" do
-    #   let(:params) {valid_params.except(:ssn)}
-    #
-    #   it "should fail validation" do
-    #     expect(CensusEmployee.create(**params).errors[:ssn].any?).to be_truthy
-    #   end
-    # end
+    context "with no ssn" do
+      let(:params) {valid_params.except(:ssn)}
+
+      it "should fail validation" do
+        expect(CensusEmployee.create(**params).errors[:ssn].any?).to be_truthy
+      end
+    end
 
     context "validates expected_selection" do
       let(:params_expected_selection) {valid_params.merge(expected_selection: "enroll")}
@@ -1407,20 +1406,6 @@ RSpec.describe CensusEmployee, type: :model, dbclean: :after_each do
     end
   end
 
-  context "have_valid_date_for_cobra with current_user" do
-    let(:census_employee100) { FactoryGirl.create(:census_employee) }
-    let(:person100) { FactoryGirl.create(:person, :with_hbx_staff_role) }
-    let(:user100) { FactoryGirl.create(:user, person: person100) }
-
-    it "should return true as the current_user is a valid admin" do
-      expect(census_employee100.have_valid_date_for_cobra?(user100)).to eq true
-    end
-
-    it "should return false as census_employee doesn't meet the requirements" do
-      expect(census_employee100.have_valid_date_for_cobra?).to eq false
-    end
-  end
-
   context "have_valid_date_for_cobra?" do
     let(:hired_on) {TimeKeeper.date_of_record}
     let(:census_employee) {FactoryGirl.create :benefit_sponsors_census_employee,
@@ -1667,27 +1652,8 @@ RSpec.describe CensusEmployee, type: :model, dbclean: :after_each do
     )
     }
 
-    let!(:dental_enrollment)   { FactoryGirl.create(:hbx_enrollment,
-      household: shop_family.active_household,
-      coverage_kind: "dental",
-      kind: "employer_sponsored",
-      benefit_group_id: census_employee.employer_profile.active_plan_year.benefit_groups.first.id,
-      employee_role_id: employee_role.id,
-      benefit_group_assignment_id: benefit_group_assignment.id,
-      aasm_state: "coverage_selected"
-      )
-    }
 
-    let!(:auto_renewing_enrollment)   { FactoryGirl.create(:hbx_enrollment,
-      household: shop_family.active_household,
-      coverage_kind: "dental",
-      kind: "employer_sponsored",
-      benefit_group_id: census_employee.employer_profile.renewing_plan_year.benefit_groups.first.id,
-      employee_role_id: employee_role.id,
-      benefit_group_assignment_id: renewal_benefit_group_assignment.id,
-      aasm_state: "auto_renewing"
-      )
-    }
+    shared_examples_for "enrollments for display" do |state, status, result|
 
       let!(:health_enrollment) {FactoryGirl.create(:hbx_enrollment,
                                                    household: census_employee.employee_role.person.primary_family.active_household,
@@ -1713,30 +1679,21 @@ RSpec.describe CensusEmployee, type: :model, dbclean: :after_each do
       )
       }
 
-    let!(:ivl_expired_dental_enrollment)   { FactoryGirl.create(:hbx_enrollment,
-      household: shop_family.latest_household,
-      coverage_kind: "dental",
-      effective_on: effective_date - 2.years,
-      enrollment_kind: "open_enrollment",
-      kind: "individual",
-      submitted_at: effective_date - 24.months,
-      aasm_state: 'coverage_expired'
-      )
-    }
-
-    context '.enrollments_for_display' do
-
-      it 'should return current shop health coverage' do
-        expect(census_employee.enrollments_for_display).to include(health_enrollment)
+      it "should #{status}return #{state} health enrollment" do
+        expect(census_employee.enrollments_for_display[0].try(:aasm_state) == state).to eq result
       end
 
-      it 'should return current shop dental coverage' do
-        expect(census_employee.enrollments_for_display).to include(dental_enrollment)
+      it "should #{status}return #{state} dental enrollment" do
+        expect(census_employee.enrollments_for_display[1].try(:aasm_state) == state).to eq result
       end
+    end
 
-      it 'should return renewing coverage' do
-        expect(census_employee.enrollments_for_display).to include(auto_renewing_enrollment)
-      end
+    it_behaves_like "enrollments for display", "coverage_selected", "", true
+    it_behaves_like "enrollments for display", "coverage_enrolled", "", true
+    it_behaves_like "enrollments for display", "coverage_termination_pending", "", true
+    it_behaves_like "enrollments for display", "coverage_terminated", "not ", false
+    it_behaves_like "enrollments for display", "coverage_expired", "not ", false
+    it_behaves_like "enrollments for display", "shopping", "not ", false
 
     it 'should return auto renewing health enrollment' do
       renewal_application.approve_application! if renewal_application.may_approve_application?

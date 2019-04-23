@@ -29,8 +29,6 @@ module PortalHeaderHelper
       link_to "#{image_tag 'icons/icon-business-owner.png'} &nbsp; I'm an Employer".html_safe, benefit_sponsors.profiles_employers_employer_profile_path(id: current_user.person.active_employer_staff_roles.first.benefit_sponsor_employer_profile_id, :tab=>'home'), class: "portal"
     elsif current_user.has_general_agency_staff_role?
       link_to "#{image_tag 'icons/icon-expert.png'} &nbsp; I'm a General Agency".html_safe, general_agencies_root_path, class: "portal"
-    elsif current_user.try(:consumer_role).try(:is_native?)
-      "<a class='portal'>native person</a>".html_safe
     else
       "<a class='portal'>#{l10n("welcome.index.byline", welcome_text: "#{Settings.site.header_message}")}</a>".html_safe
     end

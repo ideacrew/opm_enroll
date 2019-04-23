@@ -28,8 +28,8 @@ RSpec.describe ShopEmployeeNotices::NotifyEmployeeOfInitialEmployerIneligibility
                             :notice_template => 'notices/shop_employee_notices/notification_to_employee_due_to_initial_employer_ineligibility',
                             :notice_builder => 'ShopEmployeeNotices::NotifyEmployeeOfInitialEmployerIneligibility',
                             :event_name => 'notify_employee_of_initial_employer_ineligibility',
-                            :mpi_indicator => 'SHOP_D040',
-                            :title => "Termination of Employer’s Health Coverage Offered through OPM"})
+                            :mpi_indicator => 'MPI_SHOP10047',
+                            :title => "Termination of Employer’s Health Coverage Offered through DC Health Link"})
                           }
 
   let(:valid_parmas) {{
