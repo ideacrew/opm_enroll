@@ -21,7 +21,7 @@ site:
   long_name: "Massachusetts Health Connector"
   copyright_period_start: "2017"
   header_message: "The Right Place for the Right Plan"
-  logo_file_name: "mhc_logo.svg"
+  logo_file_name: "logo.png"
   make_their_premium_payments_online: "https://ww2.e-billexpress.com/ebpp/MAConnector/"
   tab_icon: 'favicon.ico'
   mailer_logo_file_name: "health_connector.png"
@@ -134,7 +134,7 @@ aca:
   address_query_county: true
   broker_routing_information: true
   recaptcha_enabled: false
-  security_questions: true
+  security_questions: false
   user_accounts_enabled: true
   plan_options_available: ["sole_source", "single_carrier", "metal_level"]
   ## acceptable options are ["sole_source", "single_carrier", "metal_level", "single_plan"]
@@ -288,16 +288,16 @@ aptc_errors:
 #   ShopPlanYearPublishedDueDayOfMonth = ShopOpenEnrollmentBeginDueDayOfMonth
 
 style:
-  primary_orange: '#c56c24'
-  brand_primary: '#005e81'
-  primary_color: '#005e81'
-  primary_notification: '#c56c24'
-  primary_panel: '#c56c24'
-  primary_button: '#337ab7'
+  primary_orange: '#2E2E2E'
+  brand_primary: '#2E2E2E'
+  primary_color: '#2E2E2E'
+  primary_notification: '#2E2E2E'
+  primary_panel: '#2E2E2E'
+  primary_button: '#2E2E2E'
   primary_button_color: '#286090'
-  primary_button_disabled: '#337ab7'
+  primary_button_disabled: '#2E2E2E'
   primary_button_border_disabled: '#2e6da4'
-  alternate_header_color: '#c56c24'
-  primary_icon_color: '#c56c24'
-  qle_header_color: '#c56c24'
+  alternate_header_color: '#2E2E2E'
+  primary_icon_color: '#2E2E2E'
+  qle_header_color: '#2E2E2E'
   primary_header_font: "'Roboto Slab', serif"

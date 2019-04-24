@@ -1,12 +1,12 @@
 site:
   key: :cca
-  subdomain: "mhc"
+  subdomain: ""
   domain_name: "hbxshop.org"
-  site_title: "Massachusetts Health Connector for Business"
-  home_url: "https://business.mahealthconnector.org/"
-  home_business_url: "https://www.mahealthconnector.org/business/"
-  help_url: "https://www.mahealthconnector.org/business/help-center"
-  faqs_url: "https://www.mahealthconnector.org/business/help-center/faqs"
+  site_title: "Office of Personnel Management"
+  home_url: "https://www.opm.gov/"
+  home_business_url: "https://www.opm.gov/"
+  help_url: "https://www.opm.gov/faqs/"
+  faqs_url: "https://www.opm.gov/faqs/"
   business_resource_center_url: "https://www.mahealthconnector.org/business/business-resource-center"
   nondiscrimination_notice_url: "https://www.MAhealthconnector.org/site-policies/nondiscrimination-notice"
   main_web_address_url: "https://www.MAhealthconnector.org"
@@ -20,10 +20,10 @@ site:
   health_care_website_url: "https://www.healthcare.gov"
   short_name: "Health Connector"
   byline: "The Right Place for the Right Plan"
-  long_name: "Massachusetts Health Connector"
+  long_name: "Office of Personnel Management"
   copyright_period_start: "2017"
   header_message: "The Right Place for the Right Plan"
-  logo_file_name: "mhc_logo.svg"
+  logo_file_name: "logo.png"
   make_their_premium_payments_online: "https://ww2.e-billexpress.com/ebpp/MAConnector/"
   tab_icon: 'favicon.ico'
   mailer_logo_file_name: "health_connector.png"
@@ -67,7 +67,7 @@ contact_center:
   payment_phone_number: "1-888-813-9220"
   ivl_number: "1-877-623-6765"
   ivl_phone_number: "1-877-623-6765"
-  email_address: "smallbusiness@mahealthconnector.org"
+  email_address: "info@opm.org"
   small_business_email: "smallbusiness@MAhealthconnector.org"
   non_discrimination_email: "Nondiscrimination@state.ma.us"
 
@@ -302,16 +302,16 @@ aptc_errors:
 #   ShopPlanYearPublishedDueDayOfMonth = ShopOpenEnrollmentBeginDueDayOfMonth
 
 style:
-  primary_orange: '#c56c24'
-  brand_primary: '#005e81'
-  primary_color: '#005e81'
-  primary_notification: '#c56c24'
-  primary_panel: '#c56c24'
-  primary_button: '#337ab7'
+  primary_orange: '#2E2E2E'
+  brand_primary: '#2E2E2E'
+  primary_color: '#2E2E2E'
+  primary_notification: '#2E2E2E'
+  primary_panel: '#2E2E2E'
+  primary_button: '#2E2E2E'
   primary_button_color: '#286090'
-  primary_button_disabled: '#337ab7'
+  primary_button_disabled: '#2E2E2E'
   primary_button_border_disabled: '#2e6da4'
-  alternate_header_color: '#c56c24'
-  primary_icon_color: '#c56c24'
-  qle_header_color: '#c56c24'
+  alternate_header_color: '#2E2E2E'
+  primary_icon_color: '#2E2E2E'
+  qle_header_color: '#2E2E2E'
   primary_header_font: "'Roboto Slab', serif"
