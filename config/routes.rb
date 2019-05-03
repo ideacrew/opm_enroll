@@ -109,6 +109,7 @@ Rails.application.routes.draw do
       root 'hbx_profiles#show'
 
       collection do
+        get :find_orgs
         get :family_index
         get :family_index_dt
         get :outstanding_verification_dt
