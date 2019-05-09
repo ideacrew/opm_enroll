@@ -120,7 +120,7 @@ DataTable.ext.renderer.pageButton.bootstrap = function ( settings, host, idx, bu
 						break;
 
 					default:
-						btnDisplay = button + 1;
+						btnDisplay =  (button + 1).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 						btnClass = page === button ?
 							'active' : '';
 						break;
