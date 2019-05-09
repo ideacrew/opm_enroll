@@ -644,7 +644,7 @@ class PlanYear
 
   def find_census_employees
     return @census_employees if defined? @census_employees
-    @census_employees ||= CensusEmployee.by_benefit_group_ids(benefit_group_ids)
+    @census_employees ||= CensusMember.by_benefit_group_ids(benefit_group_ids)
   end
 
   def covered_count
@@ -671,6 +671,7 @@ class PlanYear
   end
 
   def enrolled_by_bga
+
      candidate_benefit_group_assignments = eligible_to_enroll.map{|ce| enrolled_bga_for_ce(ce)}.compact
      enrolled_benefit_group_assignment_ids = HbxEnrollment.enrolled_shop_health_benefit_group_ids(candidate_benefit_group_assignments.map(&:id).uniq)
      bgas = candidate_benefit_group_assignments.select do |bga|
